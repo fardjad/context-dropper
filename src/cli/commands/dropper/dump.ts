@@ -24,10 +24,12 @@ export function createDropperDumpCommand(
       const dropperName = asNonEmptyString(argv.dropperName, "<dropperName>");
       validatePortableName(dropperName, "dropper");
 
-      await deps.dropperService.dump({
+      const record = await deps.dropperService.dump({
         dataDir: context.dataDir,
         dropperName,
       });
+
+      deps.stdout.write(`${JSON.stringify(record, null, 2)}\n`);
     },
   };
 }

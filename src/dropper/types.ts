@@ -17,6 +17,12 @@ export type DropperRecord = {
   updatedAt: string;
 };
 
+export type PersistedDropper = {
+  fileset: string;
+  pointer_position: number;
+  tags: Record<string, string[]>;
+};
+
 export type CreateDropperInput = {
   dataDir: string;
   filesetName: string;
@@ -68,6 +74,11 @@ export type RemoveDropperInput = {
 };
 
 export type DumpDropperInput = {
+  dataDir: string;
+  dropperName: string;
+};
+
+export type IsDoneDropperInput = {
   dataDir: string;
   dropperName: string;
 };

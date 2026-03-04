@@ -1,4 +1,6 @@
-import { throwNotImplemented } from "../file-utils/errors";
+import { mkdir, readdir, rm, stat } from "node:fs/promises";
+import path from "node:path";
+import { AppError } from "../file-utils/errors";
 import type {
   FilesetRecord,
   ImportFilesetInput,
@@ -14,20 +16,206 @@ export interface FilesetService {
   remove(input: RemoveFilesetInput): Promise<void>;
 }
 
-export class StubFilesetService implements FilesetService {
-  async importFromList(_input: ImportFilesetInput): Promise<void> {
-    throwNotImplemented("fileset import");
+export type FilesetStat = {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FilesetServiceDeps = {
+  ensureDirFn: (directoryPath: string) => Promise<void>;
+  fileExistsFn: (filePath: string) => Promise<boolean>;
+  writeTextFileFn: (filePath: string, content: string) => Promise<void>;
+  readTextFileFn: (filePath: string) => Promise<string>;
+  listFilesFn: (directoryPath: string) => Promise<string[]>;
+  deleteFileFn: (filePath: string) => Promise<void>;
+  statFileFn: (filePath: string) => Promise<FilesetStat>;
+};
+
+function isNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
+}
+
+export const defaultFilesetServiceDeps: FilesetServiceDeps = {
+  ensureDirFn: async (directoryPath: string): Promise<void> => {
+    await mkdir(directoryPath, { recursive: true });
+  },
+  fileExistsFn: async (filePath: string): Promise<boolean> => {
+    try {
+      await stat(filePath);
+      return true;
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return false;
+      }
+
+      throw error;
+    }
+  },
+  writeTextFileFn: async (filePath: string, content: string): Promise<void> => {
+    await Bun.write(filePath, content);
+  },
+  readTextFileFn: async (filePath: string): Promise<string> => {
+    return Bun.file(filePath).text();
+  },
+  listFilesFn: async (directoryPath: string): Promise<string[]> => {
+    try {
+      const names = await readdir(directoryPath);
+      return names.map((name) => path.join(directoryPath, name));
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return [];
+      }
+
+      throw error;
+    }
+  },
+  deleteFileFn: async (filePath: string): Promise<void> => {
+    await rm(filePath);
+  },
+  statFileFn: async (filePath: string): Promise<FilesetStat> => {
+    const fileStat = await stat(filePath);
+    return {
+      createdAt: fileStat.ctime.toISOString(),
+      updatedAt: fileStat.mtime.toISOString(),
+    };
+  },
+};
+
+function getFilesetsDirectory(dataDir: string): string {
+  return path.join(dataDir, "filesets");
+}
+
+function getDroppersDirectory(dataDir: string): string {
+  return path.join(dataDir, "droppers");
+}
+
+function getFilesetFilePath(dataDir: string, filesetName: string): string {
+  return path.join(getFilesetsDirectory(dataDir), `${filesetName}.txt`);
+}
+
+function parseFilesetContent(content: string): string[] {
+  return content
+    .split(/\r?\n/g)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function parseDropperReference(
+  rawJson: string,
+  dropperPath: string,
+): { fileset: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    throw new AppError(`Invalid dropper metadata: ${dropperPath}`);
   }
 
-  async list(_input: ListFilesetsInput): Promise<FilesetRecord[]> {
-    throwNotImplemented("fileset list");
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed) ||
+    typeof (parsed as { fileset?: unknown }).fileset !== "string"
+  ) {
+    throw new AppError(`Invalid dropper metadata: ${dropperPath}`);
   }
 
-  async show(_input: ShowFilesetInput): Promise<FilesetRecord> {
-    throwNotImplemented("fileset show");
+  return {
+    fileset: (parsed as { fileset: string }).fileset,
+  };
+}
+
+export class DefaultFilesetService implements FilesetService {
+  constructor(
+    private readonly deps: FilesetServiceDeps = defaultFilesetServiceDeps,
+  ) {}
+
+  async importFromList(input: ImportFilesetInput): Promise<void> {
+    const filesetsDirectory = getFilesetsDirectory(input.dataDir);
+    const filesetFilePath = getFilesetFilePath(input.dataDir, input.name);
+
+    await this.deps.ensureDirFn(filesetsDirectory);
+    if (await this.deps.fileExistsFn(filesetFilePath)) {
+      throw new AppError(`Fileset already exists: ${input.name}`);
+    }
+
+    const content =
+      input.normalizedFilePaths.length === 0
+        ? ""
+        : `${input.normalizedFilePaths.join("\n")}\n`;
+    await this.deps.writeTextFileFn(filesetFilePath, content);
   }
 
-  async remove(_input: RemoveFilesetInput): Promise<void> {
-    throwNotImplemented("fileset rm");
+  async list(input: ListFilesetsInput): Promise<FilesetRecord[]> {
+    const filesetPaths = (
+      await this.deps.listFilesFn(getFilesetsDirectory(input.dataDir))
+    )
+      .filter((filePath) => filePath.endsWith(".txt"))
+      .sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
+
+    const records: FilesetRecord[] = [];
+    for (const filesetPath of filesetPaths) {
+      const name = path.basename(filesetPath, ".txt");
+      records.push(
+        await this.show({
+          dataDir: input.dataDir,
+          name,
+        }),
+      );
+    }
+
+    return records;
+  }
+
+  async show(input: ShowFilesetInput): Promise<FilesetRecord> {
+    const filesetFilePath = getFilesetFilePath(input.dataDir, input.name);
+    if (!(await this.deps.fileExistsFn(filesetFilePath))) {
+      throw new AppError(`Fileset not found: ${input.name}`);
+    }
+
+    const [content, fileStat] = await Promise.all([
+      this.deps.readTextFileFn(filesetFilePath),
+      this.deps.statFileFn(filesetFilePath),
+    ]);
+
+    return {
+      name: input.name,
+      files: parseFilesetContent(content),
+      createdAt: fileStat.createdAt,
+      updatedAt: fileStat.updatedAt,
+    };
+  }
+
+  async remove(input: RemoveFilesetInput): Promise<void> {
+    const filesetFilePath = getFilesetFilePath(input.dataDir, input.name);
+    if (!(await this.deps.fileExistsFn(filesetFilePath))) {
+      throw new AppError(`Fileset not found: ${input.name}`);
+    }
+
+    const dependentDroppers: string[] = [];
+    const dropperPaths = (
+      await this.deps.listFilesFn(getDroppersDirectory(input.dataDir))
+    ).filter((dropperPath) => dropperPath.endsWith(".json"));
+
+    for (const dropperPath of dropperPaths) {
+      const dropperContent = await this.deps.readTextFileFn(dropperPath);
+      const reference = parseDropperReference(dropperContent, dropperPath);
+      if (reference.fileset === input.name) {
+        dependentDroppers.push(path.basename(dropperPath, ".json"));
+      }
+    }
+
+    if (dependentDroppers.length > 0) {
+      throw new AppError(
+        `Cannot remove fileset ${input.name}: referenced by droppers: ${dependentDroppers.join(", ")}`,
+      );
+    }
+
+    await this.deps.deleteFileFn(filesetFilePath);
   }
 }

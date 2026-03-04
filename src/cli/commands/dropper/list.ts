@@ -48,12 +48,16 @@ export function createDropperListCommand(
               deps.cwd,
             );
 
-      await deps.dropperService.list({
+      const entries = await deps.dropperService.list({
         dataDir: context.dataDir,
         dropperName,
         tags,
         filename,
       });
+
+      for (const entry of entries) {
+        deps.stdout.write(`${entry.path}\n`);
+      }
     },
   };
 }

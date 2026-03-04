@@ -24,10 +24,14 @@ export function createDropperListTagsCommand(
       const dropperName = asNonEmptyString(argv.dropperName, "<dropperName>");
       validatePortableName(dropperName, "dropper");
 
-      await deps.dropperService.listTags({
+      const tags = await deps.dropperService.listTags({
         dataDir: context.dataDir,
         dropperName,
       });
+
+      for (const tag of tags) {
+        deps.stdout.write(`${tag}\n`);
+      }
     },
   };
 }

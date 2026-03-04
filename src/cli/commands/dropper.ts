@@ -2,6 +2,7 @@ import type { CommandModule } from "yargs";
 import type { DropperService } from "../../dropper/service";
 import { createDropperCreateCommand } from "./dropper/create";
 import { createDropperDumpCommand } from "./dropper/dump";
+import { createDropperIsDoneCommand } from "./dropper/is-done";
 import { createDropperListCommand } from "./dropper/list";
 import { createDropperListTagsCommand } from "./dropper/list-tags";
 import { createDropperNextCommand } from "./dropper/next";
@@ -14,6 +15,7 @@ import { createDropperTagCommand } from "./dropper/tag";
 export type DropperCommandDeps = {
   cwd: string;
   dropperService: DropperService;
+  stdout: NodeJS.WritableStream;
 };
 
 export function createDropperCommand(deps: DropperCommandDeps): CommandModule {
@@ -36,6 +38,7 @@ export function createDropperCommand(deps: DropperCommandDeps): CommandModule {
         .command(createDropperListCommand(deps))
         .command(createDropperRemoveCommand(deps))
         .command(createDropperDumpCommand(deps))
+        .command(createDropperIsDoneCommand(deps))
         .strictCommands();
     },
     handler: () => {

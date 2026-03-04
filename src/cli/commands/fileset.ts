@@ -10,6 +10,7 @@ export type FilesetCommandDeps = {
   cwd: string;
   filesetService: FilesetService;
   readAndValidateFilesetEntriesFn?: typeof readAndValidateFilesetEntries;
+  stdout: NodeJS.WritableStream;
 };
 
 export function createFilesetCommand(deps: FilesetCommandDeps): CommandModule {

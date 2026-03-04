@@ -7,6 +7,7 @@ import type {
   DropperEntry,
   DropperRecord,
   DumpDropperInput,
+  IsDoneDropperInput,
   ListDropperInput,
   ListDropperTagsInput,
   NextDropperInput,
@@ -25,6 +26,7 @@ import type {
   RemoveFilesetInput,
   ShowFilesetInput,
 } from "../fileset/types";
+import { AppError } from "../file-utils/errors";
 import { runCli, type CliDependencies } from "./app";
 
 class MemoryWritable extends Writable {
@@ -106,6 +108,7 @@ function createDropperService(
         updatedAt: "",
       };
     },
+    isDone: async (_input: IsDoneDropperInput): Promise<boolean> => true,
     ...overrides,
   };
 }
@@ -172,7 +175,7 @@ describe("CLI command skeleton", () => {
   });
 
   test("strict dropper name validation is enforced", async () => {
-    const { exitCode, stderr } = await runCliWithCapturedOutput(
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
         "context-eyedropper",
@@ -193,7 +196,7 @@ describe("CLI command skeleton", () => {
   test("dropper list parses tags and normalized filename", async () => {
     let listInput: ListDropperInput | undefined;
     const cwd = process.cwd();
-    const { exitCode, stderr } = await runCliWithCapturedOutput(
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
         "context-eyedropper",
@@ -227,6 +230,48 @@ describe("CLI command skeleton", () => {
     expect(listInput?.dataDir).toBe(path.resolve(cwd, ".context-eyedropper"));
   });
 
+  test("fileset list prints one fileset name per line", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "fileset", "list"],
+      {
+        filesetService: createFilesetService({
+          list: async (): Promise<FilesetRecord[]> => {
+            return [
+              { name: "alpha", files: [], createdAt: "", updatedAt: "" },
+              { name: "beta", files: [], createdAt: "", updatedAt: "" },
+            ];
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("alpha\nbeta\n");
+  });
+
+  test("fileset show prints one file path per line", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "fileset", "show", "demo"],
+      {
+        filesetService: createFilesetService({
+          show: async (): Promise<FilesetRecord> => {
+            return {
+              name: "demo",
+              files: ["/src/a.ts", "/src/b.ts"],
+              createdAt: "",
+              updatedAt: "",
+            };
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("/src/a.ts\n/src/b.ts\n");
+  });
+
   test("fileset import resolves list entries relative to list file directory", async () => {
     const listFile = "./test-fixtures/files.txt";
     const normalizedListFilePath = path.resolve(process.cwd(), listFile);
@@ -234,7 +279,7 @@ describe("CLI command skeleton", () => {
     let seamCalledWith: string | undefined;
 
     let importInput: ImportFilesetInput | undefined;
-    const { exitCode, stderr } = await runCliWithCapturedOutput(
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
         "context-eyedropper",
@@ -265,6 +310,7 @@ describe("CLI command skeleton", () => {
     expect(importInput).toBeDefined();
     expect(importInput?.listFilePath).toBe(normalizedListFilePath);
     expect(importInput?.normalizedFilePaths).toEqual(normalizedEntries);
+    expect(stdout).toBe("");
   });
 
   test("dropper show maps exhausted state to exit code 3", async () => {
@@ -297,5 +343,132 @@ describe("CLI command skeleton", () => {
 
     expect(exitCode).toBe(4);
     expect(stderr).toContain("Dropper is already at the first item");
+  });
+
+  test("dropper show prints content and appends trailing newline", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "dropper", "show", "demo"],
+      {
+        dropperService: createDropperService({
+          show: async (): Promise<string> => {
+            return "hello world";
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("hello world\n");
+  });
+
+  test("dropper list prints path only for each entry", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "dropper", "list", "demo"],
+      {
+        dropperService: createDropperService({
+          list: async (): Promise<DropperEntry[]> => {
+            return [
+              { path: "/src/a.ts", tags: ["x"] },
+              { path: "/src/b.ts", tags: [] },
+            ];
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("/src/a.ts\n/src/b.ts\n");
+  });
+
+  test("dropper list-tags prints one tag per line", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "dropper", "list-tags", "demo"],
+      {
+        dropperService: createDropperService({
+          listTags: async (): Promise<string[]> => {
+            return ["alpha", "beta"];
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("alpha\nbeta\n");
+  });
+
+  test("dropper dump prints pretty JSON", async () => {
+    const dumpRecord: DropperRecord = {
+      name: "demo",
+      filesetName: "main",
+      entries: [{ path: "/src/a.ts", tags: ["alpha"] }],
+      pointer: { currentIndex: 0, total: 1 },
+      createdAt: "2025-01-01T00:00:00.000Z",
+      updatedAt: "2025-01-01T00:00:00.000Z",
+    };
+
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "dropper", "dump", "demo"],
+      {
+        dropperService: createDropperService({
+          dump: async (): Promise<DropperRecord> => {
+            return dumpRecord;
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe(`${JSON.stringify(dumpRecord, null, 2)}\n`);
+  });
+
+  test("write/move commands stay silent on stdout", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "dropper", "next", "demo"],
+      {
+        dropperService: createDropperService(),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("");
+    expect(stderr).toBe("");
+  });
+
+  test("dropper is-done prints true and exits 0 when complete", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "dropper", "is-done", "demo"],
+      {
+        dropperService: createDropperService({
+          isDone: async (): Promise<boolean> => true,
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("true\n");
+    expect(stderr).toBe("");
+  });
+
+  test("dropper is-done exits non-zero and prints untagged files on stderr", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-eyedropper", "dropper", "is-done", "demo"],
+      {
+        dropperService: createDropperService({
+          isDone: async (): Promise<boolean> => {
+            throw new AppError("Untagged items remain:\n/src/a.ts\n/src/b.ts");
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("Untagged items remain:");
+    expect(stderr).toContain("/src/a.ts");
+    expect(stderr).toContain("/src/b.ts");
   });
 });

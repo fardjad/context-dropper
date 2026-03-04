@@ -1,9 +1,9 @@
 import path from "node:path";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { StubDropperService, type DropperService } from "../dropper/service";
+import { DefaultDropperService, type DropperService } from "../dropper/service";
 import type { readAndValidateFilesetEntries } from "../fileset/import-list";
-import { StubFilesetService, type FilesetService } from "../fileset/service";
+import { DefaultFilesetService, type FilesetService } from "../fileset/service";
 import { formatCliError, mapErrorToExitCode } from "./error-mapper";
 import { createDropperCommand } from "./commands/dropper";
 import { createFilesetCommand } from "./commands/fileset";
@@ -25,8 +25,8 @@ export async function runCli(
   const rawArgs = hideBin(argv);
   const parseArgs = rawArgs.length === 0 ? ["--help"] : rawArgs;
   const cwd = deps.cwd ?? process.cwd();
-  const filesetService = deps.filesetService ?? new StubFilesetService();
-  const dropperService = deps.dropperService ?? new StubDropperService();
+  const filesetService = deps.filesetService ?? new DefaultFilesetService();
+  const dropperService = deps.dropperService ?? new DefaultDropperService();
   const stdout = deps.stdout ?? process.stdout;
   const stderr = deps.stderr ?? process.stderr;
 
@@ -45,9 +45,10 @@ export async function runCli(
           cwd,
           filesetService,
           readAndValidateFilesetEntriesFn: deps.readAndValidateFilesetEntriesFn,
+          stdout,
         }),
       )
-      .command(createDropperCommand({ cwd, dropperService }))
+      .command(createDropperCommand({ cwd, dropperService, stdout }))
       .completion("completion", "Generate shell completion script")
       .demandCommand(1, "You need at least one command before moving on")
       .strictCommands()

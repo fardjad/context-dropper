@@ -24,10 +24,14 @@ export function createFilesetShowCommand(
       const name = asNonEmptyString(argv.name, "<name>");
       validatePortableName(name, "fileset");
 
-      await deps.filesetService.show({
+      const fileset = await deps.filesetService.show({
         dataDir: context.dataDir,
         name,
       });
+
+      for (const filePath of fileset.files) {
+        deps.stdout.write(`${filePath}\n`);
+      }
     },
   };
 }
