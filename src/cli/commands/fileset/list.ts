@@ -7,6 +7,7 @@ export function createFilesetListCommand(
 ): CommandModule {
   return {
     command: "list",
+    aliases: ["ls"],
     describe: "List available filesets",
     handler: async (argv) => {
       const context = createCliContext(argv, deps.cwd);

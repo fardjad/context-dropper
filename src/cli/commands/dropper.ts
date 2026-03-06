@@ -7,8 +7,8 @@ import { createDropperListCommand } from "./dropper/list";
 import { createDropperListTagsCommand } from "./dropper/list-tags";
 import { createDropperNextCommand } from "./dropper/next";
 import { createDropperPreviousCommand } from "./dropper/previous";
-import { createDropperRemoveCommand } from "./dropper/rm";
-import { createDropperRemoveTagCommand } from "./dropper/rm-tag";
+import { createDropperRemoveCommand } from "./dropper/remove";
+import { createDropperRemoveTagCommand } from "./dropper/remove-tag";
 import { createDropperShowCommand } from "./dropper/show";
 import { createDropperTagCommand } from "./dropper/tag";
 

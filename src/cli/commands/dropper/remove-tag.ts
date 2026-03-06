@@ -11,7 +11,8 @@ export function createDropperRemoveTagCommand(
   deps: DropperCommandDeps,
 ): CommandModule {
   return {
-    command: "rm-tag <dropperName>",
+    command: "remove-tag <dropperName>",
+    aliases: ["rm-tag"],
     describe: "Remove tag(s) from the current item in a dropper",
     builder: (yargs) => {
       return yargs

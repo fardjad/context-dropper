@@ -11,6 +11,7 @@ export function createDropperCreateCommand(
 ): CommandModule {
   return {
     command: "create <dropperName>",
+    aliases: ["new"],
     describe: "Create a dropper from a fileset",
     builder: (yargs) => {
       return yargs

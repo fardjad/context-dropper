@@ -11,6 +11,7 @@ export function createFilesetShowCommand(
 ): CommandModule {
   return {
     command: "show <name>",
+    aliases: ["view"],
     describe: "Show files in a fileset",
     builder: (yargs) => {
       return yargs.positional("name", {

@@ -10,7 +10,8 @@ export function createFilesetRemoveCommand(
   deps: FilesetCommandDeps,
 ): CommandModule {
   return {
-    command: "rm <name>",
+    command: "remove <name>",
+    aliases: ["rm", "del", "delete"],
     describe: "Remove a fileset",
     builder: (yargs) => {
       return yargs.positional("name", {

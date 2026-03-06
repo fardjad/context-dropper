@@ -110,7 +110,7 @@ context-dropper fileset show <name>
 Remove fileset:
 
 ```bash
-context-dropper fileset rm <name>
+context-dropper fileset remove <name>
 ```
 
 - Fails if any dropper still references it.
@@ -162,7 +162,7 @@ context-dropper dropper list-tags <dropperName>
 Remove tags from current item:
 
 ```bash
-context-dropper dropper rm-tag <dropperName> --tag <text> [--tag <text>]...
+context-dropper dropper remove-tag <dropperName> --tag <text> [--tag <text>]...
 ```
 
 List dropper entries with optional filters:
@@ -187,7 +187,7 @@ context-dropper dropper dump <dropperName>
 Remove dropper:
 
 ```bash
-context-dropper dropper rm <dropperName>
+context-dropper dropper remove <dropperName>
 ```
 
 Check completion:

@@ -13,6 +13,7 @@ export function createDropperListCommand(
 ): CommandModule {
   return {
     command: "list <dropperName>",
+    aliases: ["ls"],
     describe: "List files in a dropper with optional filters",
     builder: (yargs) => {
       return yargs

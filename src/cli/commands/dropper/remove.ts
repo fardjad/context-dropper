@@ -10,7 +10,8 @@ export function createDropperRemoveCommand(
   deps: DropperCommandDeps,
 ): CommandModule {
   return {
-    command: "rm <dropperName>",
+    command: "remove <dropperName>",
+    aliases: ["rm", "del", "delete"],
     describe: "Remove a dropper",
     builder: (yargs) => {
       return yargs.positional("dropperName", {

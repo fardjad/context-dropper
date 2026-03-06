@@ -3,7 +3,7 @@ import type { readAndValidateFilesetEntries } from "../../fileset/import-list";
 import type { FilesetService } from "../../fileset/service";
 import { createFilesetImportCommand } from "./fileset/import";
 import { createFilesetListCommand } from "./fileset/list";
-import { createFilesetRemoveCommand } from "./fileset/rm";
+import { createFilesetRemoveCommand } from "./fileset/remove";
 import { createFilesetShowCommand } from "./fileset/show";
 
 export type FilesetCommandDeps = {

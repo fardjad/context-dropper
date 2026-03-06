@@ -11,6 +11,7 @@ export function createDropperShowCommand(
 ): CommandModule {
   return {
     command: "show <dropperName>",
+    aliases: ["view"],
     describe: "Show the current file content in the dropper",
     builder: (yargs) => {
       return yargs.positional("dropperName", {
