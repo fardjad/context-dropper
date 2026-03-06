@@ -1,7 +1,7 @@
 ---
+trigger: always_on
 description: Use Bun instead of Node.js, npm, pnpm, or vite.
 globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
 ---
 
 # Bun Development Rules
@@ -109,5 +109,3 @@ Then, run index.ts
 ```sh
 bun --hot ./index.ts
 ```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
