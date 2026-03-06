@@ -61,11 +61,16 @@ export type RemoveDropperTagsInput = {
   tags: string[];
 };
 
-export type ListDropperInput = {
+export type ListFilesDropperInput = {
   dataDir: string;
   dropperName: string;
   tags?: string[];
   filename?: string;
+};
+
+export type ListDropperInput = {
+  dataDir: string;
+  filesetName?: string;
 };
 
 export type RemoveDropperInput = {

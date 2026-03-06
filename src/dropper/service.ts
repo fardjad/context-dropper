@@ -1,4 +1,4 @@
-import { mkdir, rm, stat } from "node:fs/promises";
+import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { AppError } from "../file-utils/errors";
 import { DropperAtStartError, DropperExhaustedError } from "./errors";
@@ -9,6 +9,7 @@ import type {
   DumpDropperInput,
   IsDoneDropperInput,
   ListDropperInput,
+  ListFilesDropperInput,
   ListDropperTagsInput,
   NextDropperInput,
   PreviousDropperInput,
@@ -27,7 +28,8 @@ export interface DropperService {
   tag(input: TagDropperInput): Promise<void>;
   listTags(input: ListDropperTagsInput): Promise<string[]>;
   removeTags(input: RemoveDropperTagsInput): Promise<void>;
-  list(input: ListDropperInput): Promise<DropperEntry[]>;
+  list(input: ListDropperInput): Promise<string[]>;
+  listFiles(input: ListFilesDropperInput): Promise<DropperEntry[]>;
   remove(input: RemoveDropperInput): Promise<void>;
   dump(input: DumpDropperInput): Promise<DropperRecord>;
   isDone(input: IsDoneDropperInput): Promise<boolean>;
@@ -46,6 +48,7 @@ export type DropperServiceDeps = {
   deleteFileFn: (filePath: string) => Promise<void>;
   statFileFn: (filePath: string) => Promise<DropperStat>;
   readSourceFileFn: (filePath: string) => Promise<string>;
+  readDirFn: (directoryPath: string) => Promise<string[]>;
 };
 
 function isNotFoundError(error: unknown): boolean {
@@ -91,6 +94,16 @@ export const defaultDropperServiceDeps: DropperServiceDeps = {
   },
   readSourceFileFn: async (filePath: string): Promise<string> => {
     return Bun.file(filePath).text();
+  },
+  readDirFn: async (directoryPath: string): Promise<string[]> => {
+    try {
+      return await readdir(directoryPath);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return [];
+      }
+      throw error;
+    }
   },
 };
 
@@ -432,7 +445,7 @@ export class DefaultDropperService implements DropperService {
     await this.saveDropper(filePath, persisted);
   }
 
-  async list(input: ListDropperInput): Promise<DropperEntry[]> {
+  async listFiles(input: ListFilesDropperInput): Promise<DropperEntry[]> {
     const { persisted } = await this.loadDropper(
       input.dataDir,
       input.dropperName,
@@ -456,6 +469,37 @@ export class DefaultDropperService implements DropperService {
     }
 
     return entries;
+  }
+
+  async list(input: ListDropperInput): Promise<string[]> {
+    const droppersDirectory = getDroppersDirectory(input.dataDir);
+    const files = await this.deps.readDirFn(droppersDirectory);
+
+    // Get all valid dropper names by stripping .json extension
+    const validNames = files
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => file.slice(0, -5))
+      .sort((a, b) => a.localeCompare(b));
+
+    if (input.filesetName === undefined) {
+      return validNames;
+    }
+
+    // If filtering by fileset, we need to read each dropper to check its fileset source
+    const matchedDroppers: string[] = [];
+    for (const name of validNames) {
+      try {
+        const { persisted } = await this.loadDropper(input.dataDir, name);
+        if (persisted.fileset === input.filesetName) {
+          matchedDroppers.push(name);
+        }
+      } catch (error) {
+        // Ignore files that are broken
+        continue;
+      }
+    }
+
+    return matchedDroppers;
   }
 
   async remove(input: RemoveDropperInput): Promise<void> {

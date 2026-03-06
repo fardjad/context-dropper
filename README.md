@@ -168,13 +168,24 @@ context-dropper dropper remove-tag <dropperName> --tag <text> [--tag <text>]...
 List dropper entries with optional filters:
 
 ```bash
-context-dropper dropper list <dropperName> [--tag <tag>]... [--filename <absolutePath>]
+context-dropper dropper list-files <dropperName> [--tag <tag>]... [--filename <absolutePath>]
 ```
 
 - Output: paths only, one per line.
 - Repeated `--tag` uses OR semantics.
 - `--filename` is exact path match.
 - When both are provided: AND semantics (`filename` match and tag OR match).
+- Aliases: `context-dropper dropper ls-files <dropperName>`
+
+List all droppers, optionally filtered by fileset name:
+
+```bash
+context-dropper dropper list [--fileset <filesetName>]
+```
+
+- Output: one dropper name per line.
+- When `--fileset` is provided, filters for droppers referencing that fileset.
+- Aliases: `context-dropper dropper ls [--fileset <filesetName>]`
 
 Dump dropper materialized state:
 

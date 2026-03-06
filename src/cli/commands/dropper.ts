@@ -4,6 +4,7 @@ import { createDropperCreateCommand } from "./dropper/create";
 import { createDropperDumpCommand } from "./dropper/dump";
 import { createDropperIsDoneCommand } from "./dropper/is-done";
 import { createDropperListCommand } from "./dropper/list";
+import { createDropperListFilesCommand } from "./dropper/list-files";
 import { createDropperListTagsCommand } from "./dropper/list-tags";
 import { createDropperNextCommand } from "./dropper/next";
 import { createDropperPreviousCommand } from "./dropper/previous";
@@ -36,6 +37,7 @@ export function createDropperCommand(deps: DropperCommandDeps): CommandModule {
         .command(createDropperListTagsCommand(deps))
         .command(createDropperRemoveTagCommand(deps))
         .command(createDropperListCommand(deps))
+        .command(createDropperListFilesCommand(deps))
         .command(createDropperRemoveCommand(deps))
         .command(createDropperDumpCommand(deps))
         .command(createDropperIsDoneCommand(deps))

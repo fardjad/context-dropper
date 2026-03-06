@@ -9,6 +9,7 @@ import type {
   DumpDropperInput,
   IsDoneDropperInput,
   ListDropperInput,
+  ListFilesDropperInput,
   ListDropperTagsInput,
   NextDropperInput,
   PreviousDropperInput,
@@ -96,7 +97,10 @@ function createDropperService(
     tag: async (_input: TagDropperInput) => {},
     listTags: async (_input: ListDropperTagsInput): Promise<string[]> => [],
     removeTags: async (_input: RemoveDropperTagsInput) => {},
-    list: async (_input: ListDropperInput): Promise<DropperEntry[]> => [],
+    list: async (_input: ListDropperInput): Promise<string[]> => [],
+    listFiles: async (
+      _input: ListFilesDropperInput,
+    ): Promise<DropperEntry[]> => [],
     remove: async (_input: RemoveDropperInput) => {},
     dump: async (_input: DumpDropperInput): Promise<DropperRecord> => {
       return {
@@ -193,15 +197,15 @@ describe("CLI command skeleton", () => {
     expect(stderr).toContain("Invalid dropper name: bad name");
   });
 
-  test("dropper list parses tags and normalized filename", async () => {
-    let listInput: ListDropperInput | undefined;
+  test("dropper list-files parses tags and normalized filename", async () => {
+    let listInput: ListFilesDropperInput | undefined;
     const cwd = process.cwd();
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
         "context-dropper",
         "dropper",
-        "list",
+        "list-files",
         "demo",
         "--tag",
         "alpha",
@@ -213,7 +217,9 @@ describe("CLI command skeleton", () => {
       {
         cwd,
         dropperService: createDropperService({
-          list: async (input: ListDropperInput): Promise<DropperEntry[]> => {
+          listFiles: async (
+            input: ListFilesDropperInput,
+          ): Promise<DropperEntry[]> => {
             listInput = input;
             return [];
           },
@@ -362,12 +368,12 @@ describe("CLI command skeleton", () => {
     expect(stdout).toBe("hello world\n");
   });
 
-  test("dropper list prints path only for each entry", async () => {
+  test("dropper list-files prints path only for each entry", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "list", "demo"],
+      ["bun", "context-dropper", "dropper", "list-files", "demo"],
       {
         dropperService: createDropperService({
-          list: async (): Promise<DropperEntry[]> => {
+          listFiles: async (): Promise<DropperEntry[]> => {
             return [
               { path: "/src/a.ts", tags: ["x"] },
               { path: "/src/b.ts", tags: [] },
@@ -380,6 +386,23 @@ describe("CLI command skeleton", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toBe("/src/a.ts\n/src/b.ts\n");
+  });
+
+  test("dropper list prints valid droppers with an optional fileset filter", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "dropper", "list", "--fileset", "f1"],
+      {
+        dropperService: createDropperService({
+          list: async (): Promise<string[]> => {
+            return ["d1", "d2"];
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("d1\nd2\n");
   });
 
   test("dropper list-tags prints one tag per line", async () => {

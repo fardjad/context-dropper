@@ -94,6 +94,15 @@ function createMemoryDropperDeps(initialFiles: Record<string, string> = {}): {
 
       return file.content;
     },
+    readDirFn: async (directoryPath: string): Promise<string[]> => {
+      const results: string[] = [];
+      for (const filePath of files.keys()) {
+        if (filePath.startsWith(directoryPath)) {
+          results.push(path.basename(filePath));
+        }
+      }
+      return results;
+    },
   };
 
   return { deps, files, ensuredDirs };
@@ -250,7 +259,7 @@ describe("dropper/service", () => {
     });
   });
 
-  test("list applies no filter, tag OR filter, filename filter, and AND combination", async () => {
+  test("listFiles applies no filter, tag OR filter, filename filter, and AND combination", async () => {
     const dataDir = "/data";
     const { deps } = createMemoryDropperDeps({
       [path.join(dataDir, "filesets", "demo.txt")]:
@@ -266,14 +275,14 @@ describe("dropper/service", () => {
     });
     const service = new DefaultDropperService(deps);
 
-    const all = await service.list({ dataDir, dropperName: "d1" });
+    const all = await service.listFiles({ dataDir, dropperName: "d1" });
     expect(all.map((entry) => entry.path)).toEqual([
       "/src/a.ts",
       "/src/b.ts",
       "/src/c.ts",
     ]);
 
-    const byTags = await service.list({
+    const byTags = await service.listFiles({
       dataDir,
       dropperName: "d1",
       tags: ["x", "y"],
@@ -284,20 +293,64 @@ describe("dropper/service", () => {
       "/src/c.ts",
     ]);
 
-    const byFilename = await service.list({
+    const byFilename = await service.listFiles({
       dataDir,
       dropperName: "d1",
       filename: "/src/b.ts",
     });
     expect(byFilename.map((entry) => entry.path)).toEqual(["/src/b.ts"]);
 
-    const andCombined = await service.list({
+    const andCombined = await service.listFiles({
       dataDir,
       dropperName: "d1",
       filename: "/src/b.ts",
       tags: ["y"],
     });
     expect(andCombined).toEqual([]);
+  });
+
+  test("list retrieves all droppers in the data dir, honoring the fileset filter", async () => {
+    const dataDir = "/data";
+    const { deps } = createMemoryDropperDeps({
+      // Provide valid dropper files
+      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
+        fileset: "f1",
+        pointer_position: 0,
+        tags: {},
+      }),
+      [path.join(dataDir, "droppers", "d2.json")]: JSON.stringify({
+        fileset: "f2",
+        pointer_position: 0,
+        tags: {},
+      }),
+      // Ignore invalid ones
+      [path.join(dataDir, "droppers", "broken.json")]: "invalid json",
+    });
+
+    // Simulate fs.readdir to be available instead of relying on the system
+    deps.readDirFn = async () => [
+      "d1.json",
+      "d2.json",
+      "broken.json",
+      "text.txt",
+    ];
+
+    const service = new DefaultDropperService(deps);
+
+    const unfiltered = await service.list({ dataDir });
+    expect(unfiltered).toEqual(["broken", "d1", "d2"]);
+
+    const filtered1 = await service.list({ dataDir, filesetName: "f1" });
+    expect(filtered1).toEqual(["d1"]);
+
+    const filtered2 = await service.list({ dataDir, filesetName: "f2" });
+    expect(filtered2).toEqual(["d2"]);
+
+    const filtered3 = await service.list({
+      dataDir,
+      filesetName: "non-existent",
+    });
+    expect(filtered3).toEqual([]);
   });
 
   test("dump materializes dropper record and remove deletes persisted file", async () => {
