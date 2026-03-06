@@ -1,5 +1,5 @@
 {
-  "name": "context-eyedropper",
+  "name": "context-dropper",
   "module": "src/index.ts",
   "type": "module",
   "private": true,

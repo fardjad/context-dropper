@@ -117,7 +117,7 @@ describe("CLI command skeleton", () => {
   test("no command shows usage and exits successfully", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
-      "context-eyedropper",
+      "context-dropper",
     ]);
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
@@ -126,7 +126,7 @@ describe("CLI command skeleton", () => {
   test("help exits successfully", async () => {
     const { exitCode } = await runCliWithCapturedOutput([
       "bun",
-      "context-eyedropper",
+      "context-dropper",
       "--help",
     ]);
     expect(exitCode).toBe(0);
@@ -135,7 +135,7 @@ describe("CLI command skeleton", () => {
   test("fileset without subcommand shows usage and exits successfully", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
-      "context-eyedropper",
+      "context-dropper",
       "fileset",
     ]);
     expect(exitCode).toBe(0);
@@ -145,7 +145,7 @@ describe("CLI command skeleton", () => {
   test("dropper without subcommand shows usage and exits successfully", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
-      "context-eyedropper",
+      "context-dropper",
       "dropper",
     ]);
     expect(exitCode).toBe(0);
@@ -155,7 +155,7 @@ describe("CLI command skeleton", () => {
   test("extract command is not registered", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
-      "context-eyedropper",
+      "context-dropper",
       "extract",
     ]);
     expect(exitCode).toBe(2);
@@ -165,7 +165,7 @@ describe("CLI command skeleton", () => {
   test("missing required args returns usage exit code 2", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
-      "context-eyedropper",
+      "context-dropper",
       "dropper",
       "create",
       "demo",
@@ -178,7 +178,7 @@ describe("CLI command skeleton", () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
-        "context-eyedropper",
+        "context-dropper",
         "dropper",
         "create",
         "bad name",
@@ -199,7 +199,7 @@ describe("CLI command skeleton", () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
-        "context-eyedropper",
+        "context-dropper",
         "dropper",
         "list",
         "demo",
@@ -227,12 +227,12 @@ describe("CLI command skeleton", () => {
     expect(listInput?.dropperName).toBe("demo");
     expect(listInput?.tags).toEqual(["alpha", "beta"]);
     expect(listInput?.filename).toBe(path.resolve(cwd, "README.md"));
-    expect(listInput?.dataDir).toBe(path.resolve(cwd, ".context-eyedropper"));
+    expect(listInput?.dataDir).toBe(path.resolve(cwd, ".context-dropper"));
   });
 
   test("fileset list prints one fileset name per line", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "fileset", "list"],
+      ["bun", "context-dropper", "fileset", "list"],
       {
         filesetService: createFilesetService({
           list: async (): Promise<FilesetRecord[]> => {
@@ -252,7 +252,7 @@ describe("CLI command skeleton", () => {
 
   test("fileset show prints one file path per line", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "fileset", "show", "demo"],
+      ["bun", "context-dropper", "fileset", "show", "demo"],
       {
         filesetService: createFilesetService({
           show: async (): Promise<FilesetRecord> => {
@@ -282,7 +282,7 @@ describe("CLI command skeleton", () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
-        "context-eyedropper",
+        "context-dropper",
         "fileset",
         "import",
         "--name",
@@ -315,7 +315,7 @@ describe("CLI command skeleton", () => {
 
   test("dropper show maps exhausted state to exit code 3", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "show", "demo"],
+      ["bun", "context-dropper", "dropper", "show", "demo"],
       {
         dropperService: createDropperService({
           show: async (_input: ShowDropperInput): Promise<string> => {
@@ -331,7 +331,7 @@ describe("CLI command skeleton", () => {
 
   test("dropper previous maps at-start state to exit code 4", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "previous", "demo"],
+      ["bun", "context-dropper", "dropper", "previous", "demo"],
       {
         dropperService: createDropperService({
           previous: async (_input: PreviousDropperInput): Promise<void> => {
@@ -347,7 +347,7 @@ describe("CLI command skeleton", () => {
 
   test("dropper show prints content and appends trailing newline", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "show", "demo"],
+      ["bun", "context-dropper", "dropper", "show", "demo"],
       {
         dropperService: createDropperService({
           show: async (): Promise<string> => {
@@ -364,7 +364,7 @@ describe("CLI command skeleton", () => {
 
   test("dropper list prints path only for each entry", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "list", "demo"],
+      ["bun", "context-dropper", "dropper", "list", "demo"],
       {
         dropperService: createDropperService({
           list: async (): Promise<DropperEntry[]> => {
@@ -384,7 +384,7 @@ describe("CLI command skeleton", () => {
 
   test("dropper list-tags prints one tag per line", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "list-tags", "demo"],
+      ["bun", "context-dropper", "dropper", "list-tags", "demo"],
       {
         dropperService: createDropperService({
           listTags: async (): Promise<string[]> => {
@@ -410,7 +410,7 @@ describe("CLI command skeleton", () => {
     };
 
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "dump", "demo"],
+      ["bun", "context-dropper", "dropper", "dump", "demo"],
       {
         dropperService: createDropperService({
           dump: async (): Promise<DropperRecord> => {
@@ -427,7 +427,7 @@ describe("CLI command skeleton", () => {
 
   test("write/move commands stay silent on stdout", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "next", "demo"],
+      ["bun", "context-dropper", "dropper", "next", "demo"],
       {
         dropperService: createDropperService(),
       },
@@ -440,7 +440,7 @@ describe("CLI command skeleton", () => {
 
   test("dropper is-done prints true and exits 0 when complete", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "is-done", "demo"],
+      ["bun", "context-dropper", "dropper", "is-done", "demo"],
       {
         dropperService: createDropperService({
           isDone: async (): Promise<boolean> => true,
@@ -455,7 +455,7 @@ describe("CLI command skeleton", () => {
 
   test("dropper is-done exits non-zero and prints untagged files on stderr", async () => {
     const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-eyedropper", "dropper", "is-done", "demo"],
+      ["bun", "context-dropper", "dropper", "is-done", "demo"],
       {
         dropperService: createDropperService({
           isDone: async (): Promise<boolean> => {

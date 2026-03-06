@@ -1,6 +1,6 @@
-# context-eyedropper
+# context-dropper
 
-`context-eyedropper` is a CLI for iterating through a fixed list of files, tracking
+`context-dropper` is a CLI for iterating through a fixed list of files, tracking
 position, and tagging progress.
 
 ## Install and Run
@@ -18,19 +18,19 @@ bun run src/index.ts --help
 Or after building your own wrapper/binary, use:
 
 ```bash
-context-eyedropper --help
+context-dropper --help
 ```
 
 ## Command Shape
 
 ```bash
-context-eyedropper [--data-dir <path>] <command>
+context-dropper [--data-dir <path>] <command>
 ```
 
 Global option:
 
 - `--data-dir <path>`: directory where filesets and droppers are stored.
-- Default: `./.context-eyedropper` resolved from current working directory.
+- Default: `./.context-dropper` resolved from current working directory.
 
 If run with no command, usage/help is shown. If `fileset` or `dropper` are run
 without a subcommand, that group help is shown.
@@ -82,7 +82,7 @@ Fileset/dropper names must:
 Import from a list file:
 
 ```bash
-context-eyedropper fileset import --name <name> <listFilePath>
+context-dropper fileset import --name <name> <listFilePath>
 ```
 
 - `listFilePath` must be plain text with one path per line.
@@ -94,7 +94,7 @@ context-eyedropper fileset import --name <name> <listFilePath>
 List filesets:
 
 ```bash
-context-eyedropper fileset list
+context-dropper fileset list
 ```
 
 - Output: one fileset name per line.
@@ -102,7 +102,7 @@ context-eyedropper fileset list
 Show fileset contents:
 
 ```bash
-context-eyedropper fileset show <name>
+context-dropper fileset show <name>
 ```
 
 - Output: one file path per line.
@@ -110,7 +110,7 @@ context-eyedropper fileset show <name>
 Remove fileset:
 
 ```bash
-context-eyedropper fileset rm <name>
+context-dropper fileset rm <name>
 ```
 
 - Fails if any dropper still references it.
@@ -120,19 +120,19 @@ context-eyedropper fileset rm <name>
 Create:
 
 ```bash
-context-eyedropper dropper create --fileset <filesetName> <dropperName>
+context-dropper dropper create --fileset <filesetName> <dropperName>
 ```
 
 Show current file contents:
 
 ```bash
-context-eyedropper dropper show <dropperName>
+context-dropper dropper show <dropperName>
 ```
 
 Move pointer forward:
 
 ```bash
-context-eyedropper dropper next <dropperName>
+context-dropper dropper next <dropperName>
 ```
 
 - Silent on success.
@@ -140,7 +140,7 @@ context-eyedropper dropper next <dropperName>
 Move pointer backward:
 
 ```bash
-context-eyedropper dropper previous <dropperName>
+context-dropper dropper previous <dropperName>
 ```
 
 - Silent on success.
@@ -148,13 +148,13 @@ context-eyedropper dropper previous <dropperName>
 Tag current item:
 
 ```bash
-context-eyedropper dropper tag <dropperName> --tag <text> [--tag <text>]...
+context-dropper dropper tag <dropperName> --tag <text> [--tag <text>]...
 ```
 
 List tags of current item:
 
 ```bash
-context-eyedropper dropper list-tags <dropperName>
+context-dropper dropper list-tags <dropperName>
 ```
 
 - Output: one tag per line.
@@ -162,13 +162,13 @@ context-eyedropper dropper list-tags <dropperName>
 Remove tags from current item:
 
 ```bash
-context-eyedropper dropper rm-tag <dropperName> --tag <text> [--tag <text>]...
+context-dropper dropper rm-tag <dropperName> --tag <text> [--tag <text>]...
 ```
 
 List dropper entries with optional filters:
 
 ```bash
-context-eyedropper dropper list <dropperName> [--tag <tag>]... [--filename <absolutePath>]
+context-dropper dropper list <dropperName> [--tag <tag>]... [--filename <absolutePath>]
 ```
 
 - Output: paths only, one per line.
@@ -179,7 +179,7 @@ context-eyedropper dropper list <dropperName> [--tag <tag>]... [--filename <abso
 Dump dropper materialized state:
 
 ```bash
-context-eyedropper dropper dump <dropperName>
+context-dropper dropper dump <dropperName>
 ```
 
 - Output: pretty JSON.
@@ -187,13 +187,13 @@ context-eyedropper dropper dump <dropperName>
 Remove dropper:
 
 ```bash
-context-eyedropper dropper rm <dropperName>
+context-dropper dropper rm <dropperName>
 ```
 
 Check completion:
 
 ```bash
-context-eyedropper dropper is-done <dropperName>
+context-dropper dropper is-done <dropperName>
 ```
 
 - Done condition: every file has at least one tag.
@@ -211,9 +211,9 @@ context-eyedropper dropper is-done <dropperName>
 ## Suggested AI-Agent Workflow
 
 1. Import a fileset:
-   `context-eyedropper fileset import --name <filesetName> <listFilePath>`
+   `context-dropper fileset import --name <filesetName> <listFilePath>`
 2. Create a dropper:
-   `context-eyedropper dropper create --fileset <filesetName> <dropperName>`
+   `context-dropper dropper create --fileset <filesetName> <dropperName>`
 3. Ask the agent to perform the task (for example: review/document each file)
    and follow the processing loop below.
 
@@ -221,13 +221,13 @@ context-eyedropper dropper is-done <dropperName>
 
 When acting as an agent over a dropper, use this exact loop:
 
-1. Run `context-eyedropper dropper show <dropperName>`.
+1. Run `context-dropper dropper show <dropperName>`.
 2. Perform the requested task on that file content.
-3. Run `context-eyedropper dropper tag <dropperName> --tag processed`.
-4. Run `context-eyedropper dropper is-done <dropperName>`.
+3. Run `context-dropper dropper tag <dropperName> --tag processed`.
+4. Run `context-dropper dropper is-done <dropperName>`.
 5. If `is-done` succeeded and printed `true`, stop.
 6. If `is-done` failed because untagged items remain, run
-   `context-eyedropper dropper next <dropperName>` and repeat from step 1.
+   `context-dropper dropper next <dropperName>` and repeat from step 1.
 
 Notes for agents:
 

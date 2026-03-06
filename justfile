@@ -7,7 +7,7 @@ build-all: build build-linux-x64 build-windows-x64 build-macos-x64 build-macos-a
 
 # Build the project into a single executable for the current platform
 build:
-    bun build ./src/index.ts --compile --outfile=dist/context-eyedropper
+    bun build ./src/index.ts --compile --outfile=dist/context-dropper
 
 # Remove build artifacts
 clean:
@@ -19,19 +19,19 @@ run *args:
 
 # Cross-compile for Linux x64
 build-linux-x64:
-    bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile=dist/context-eyedropper-linux-x64
+    bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile=dist/context-dropper-linux-x64
 
 # Cross-compile for Windows x64
 build-windows-x64:
-    bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile=dist/context-eyedropper-windows-x64.exe
+    bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile=dist/context-dropper-windows-x64.exe
 
 # Cross-compile for macOS x64
 build-macos-x64:
-    bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/context-eyedropper-macos-x64
+    bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/context-dropper-macos-x64
 
 # Cross-compile for macOS arm64
 build-macos-arm64:
-    bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/context-eyedropper-macos-arm64
+    bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/context-dropper-macos-arm64
 
 # Run tests
 test:
@@ -51,6 +51,6 @@ test-completion-zsh: build
     @TMPDIR=$(mktemp -d) && \
     echo 'export PATH="'$(pwd)'/dist:$PATH"' > "$TMPDIR/.zshrc" && \
     echo 'autoload -Uz compinit && compinit' >> "$TMPDIR/.zshrc" && \
-    SHELL=/bin/zsh ./dist/context-eyedropper completion >> "$TMPDIR/.zshrc" && \
+    SHELL=/bin/zsh ./dist/context-dropper completion >> "$TMPDIR/.zshrc" && \
     ZDOTDIR="$TMPDIR" zsh -i; \
     rm -rf "$TMPDIR"

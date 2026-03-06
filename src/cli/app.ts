@@ -32,12 +32,12 @@ export async function runCli(
 
   try {
     await yargs(parseArgs)
-      .scriptName("context-eyedropper")
+      .scriptName("context-dropper")
       .usage("$0 [--data-dir <path>] <cmd> [args]")
       .option("data-dir", {
         type: "string",
         global: true,
-        default: path.resolve(cwd, ".context-eyedropper"),
+        default: path.resolve(cwd, ".context-dropper"),
         describe: "Directory for tool data files",
       })
       .command(
