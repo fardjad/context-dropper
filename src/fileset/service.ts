@@ -45,16 +45,7 @@ export const defaultFilesetServiceDeps: FilesetServiceDeps = {
     await mkdir(directoryPath, { recursive: true });
   },
   fileExistsFn: async (filePath: string): Promise<boolean> => {
-    try {
-      await stat(filePath);
-      return true;
-    } catch (error) {
-      if (isNotFoundError(error)) {
-        return false;
-      }
-
-      throw error;
-    }
+    return Bun.file(filePath).exists();
   },
   writeTextFileFn: async (filePath: string, content: string): Promise<void> => {
     await Bun.write(filePath, content);
@@ -133,7 +124,7 @@ function parseDropperReference(
 export class DefaultFilesetService implements FilesetService {
   constructor(
     private readonly deps: FilesetServiceDeps = defaultFilesetServiceDeps,
-  ) {}
+  ) { }
 
   async importFromList(input: ImportFilesetInput): Promise<void> {
     const filesetsDirectory = getFilesetsDirectory(input.dataDir);

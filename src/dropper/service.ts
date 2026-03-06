@@ -65,16 +65,7 @@ export const defaultDropperServiceDeps: DropperServiceDeps = {
     await mkdir(directoryPath, { recursive: true });
   },
   fileExistsFn: async (filePath: string): Promise<boolean> => {
-    try {
-      await stat(filePath);
-      return true;
-    } catch (error) {
-      if (isNotFoundError(error)) {
-        return false;
-      }
-
-      throw error;
-    }
+    return Bun.file(filePath).exists();
   },
   readTextFileFn: async (filePath: string): Promise<string> => {
     return Bun.file(filePath).text();
@@ -211,7 +202,7 @@ function withTrailingNewline(value: string): string {
 export class DefaultDropperService implements DropperService {
   constructor(
     private readonly deps: DropperServiceDeps = defaultDropperServiceDeps,
-  ) {}
+  ) { }
 
   private async loadFilesetFiles(
     dataDir: string,
@@ -524,7 +515,7 @@ export class DefaultDropperService implements DropperService {
     const metadata = await this.deps.statFileFn(filePath);
     const pointer =
       persisted.pointer_position >= 0 &&
-      persisted.pointer_position < entries.length
+        persisted.pointer_position < entries.length
         ? persisted.pointer_position
         : null;
 
