@@ -3,6 +3,14 @@
 `context-dropper` is a CLI for iterating through a fixed list of files, tracking
 position, and tagging progress.
 
+## Why Context Dropper?
+
+When AI coding agents explore a codebase, they typically rely on keyword or semantic search. While this works well enough for smaller tasks, there is no guarantee that the agent will actually find and examine every single file that is relevant to a larger refactor or objective.
+
+On the flip side, feeding an entire codebase directly into the context window is highly ineffective. As the context size grows, models tend to lose track of instructions and their reasoning capabilities degrade quickly.
+
+`context-dropper` helps bridge this gap by letting the user set up a strict, programmable processing loop. The user can build a precise list of target files (a "fileset") either manually or using other tools, and then instruct the agent to process that exact list sequentially. As the agent progresses, each file _can_ be evaluated in a **clean context** (dropping the previous file's tokens). This saves tokens and keeps the model's reasoning sharp, and guarantees coverage without hitting context limits.
+
 ## Installation
 
 You can install `context-dropper` using one of the following methods.
