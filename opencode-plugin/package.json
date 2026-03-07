@@ -1,6 +1,6 @@
 {
   "name": "opencode-context-dropper-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Context Dropper plugin for OpenCode that automates file iteration context management.",
   "author": {
     "name": "Fardjad Davari",
