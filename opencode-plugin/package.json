@@ -21,7 +21,7 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist/index.js"],
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target node",
     "prepack": "npm run build"
