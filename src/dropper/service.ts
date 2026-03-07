@@ -1,4 +1,12 @@
-import { mkdir, readdir, rm, stat } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  rm,
+  stat,
+  readFile,
+  writeFile,
+  access,
+} from "node:fs/promises";
 import path from "node:path";
 import { AppError } from "../file-utils/errors";
 import { DropperAtStartError, DropperExhaustedError } from "./errors";
@@ -65,13 +73,18 @@ export const defaultDropperServiceDeps: DropperServiceDeps = {
     await mkdir(directoryPath, { recursive: true });
   },
   fileExistsFn: async (filePath: string): Promise<boolean> => {
-    return Bun.file(filePath).exists();
+    try {
+      await access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
   },
   readTextFileFn: async (filePath: string): Promise<string> => {
-    return Bun.file(filePath).text();
+    return await readFile(filePath, "utf-8");
   },
   writeTextFileFn: async (filePath: string, content: string): Promise<void> => {
-    await Bun.write(filePath, content);
+    await writeFile(filePath, content, "utf-8");
   },
   deleteFileFn: async (filePath: string): Promise<void> => {
     await rm(filePath);
@@ -84,7 +97,7 @@ export const defaultDropperServiceDeps: DropperServiceDeps = {
     };
   },
   readSourceFileFn: async (filePath: string): Promise<string> => {
-    return Bun.file(filePath).text();
+    return await readFile(filePath, "utf-8");
   },
   readDirFn: async (directoryPath: string): Promise<string[]> => {
     try {
@@ -202,7 +215,7 @@ function withTrailingNewline(value: string): string {
 export class DefaultDropperService implements DropperService {
   constructor(
     private readonly deps: DropperServiceDeps = defaultDropperServiceDeps,
-  ) { }
+  ) {}
 
   private async loadFilesetFiles(
     dataDir: string,
@@ -515,7 +528,7 @@ export class DefaultDropperService implements DropperService {
     const metadata = await this.deps.statFileFn(filePath);
     const pointer =
       persisted.pointer_position >= 0 &&
-        persisted.pointer_position < entries.length
+      persisted.pointer_position < entries.length
         ? persisted.pointer_position
         : null;
 

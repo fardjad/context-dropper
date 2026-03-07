@@ -3,11 +3,15 @@ help:
     @just --list
 
 # Cross-compile for all supported platforms
-build-all: build build-linux-x64 build-windows-x64 build-macos-x64 build-macos-arm64
+build-all: build build-plugin build-linux-x64 build-windows-x64 build-macos-x64 build-macos-arm64
 
 # Build the project into a single executable for the current platform
 build:
     bun build ./src/index.ts --compile --outfile=dist/context-dropper
+
+# Build the opencode plugin
+build-plugin:
+    cd opencode-plugin && bun run build
 
 # Remove build artifacts
 clean:
@@ -36,6 +40,12 @@ build-macos-arm64:
 # Run tests
 test:
     bun test
+    cd opencode-plugin && bun test
+
+# Upgrade dependencies in root and plugin
+upgrade:
+    bun update
+    cd opencode-plugin && bun update
 
 # Format code
 fmt:

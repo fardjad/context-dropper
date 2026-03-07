@@ -211,6 +211,12 @@ context-dropper dropper is-done <dropperName>
 - If done: prints `true` and exits `0`.
 - If not done: exits non-zero with an error listing untagged files.
 
+## OpenCode Plugin
+
+This repository also includes a dedicated, self-contained plugin for [OpenCode](https://github.com/opencode-ai/opencode) under `opencode-plugin/`.
+The plugin natively binds to the `context-dropper` APIs and lets you iterate through filesets autonomously inside an OpenCode chat session.
+See [opencode-plugin/README.md](./opencode-plugin/README.md) for installation and usage instructions.
+
 ## Exit Codes
 
 - `0`: success

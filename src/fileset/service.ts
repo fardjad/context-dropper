@@ -1,4 +1,12 @@
-import { mkdir, readdir, rm, stat } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  rm,
+  stat,
+  readFile,
+  writeFile,
+  access,
+} from "node:fs/promises";
 import path from "node:path";
 import { AppError } from "../file-utils/errors";
 import type {
@@ -45,13 +53,18 @@ export const defaultFilesetServiceDeps: FilesetServiceDeps = {
     await mkdir(directoryPath, { recursive: true });
   },
   fileExistsFn: async (filePath: string): Promise<boolean> => {
-    return Bun.file(filePath).exists();
+    try {
+      await access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
   },
   writeTextFileFn: async (filePath: string, content: string): Promise<void> => {
-    await Bun.write(filePath, content);
+    await writeFile(filePath, content, "utf-8");
   },
   readTextFileFn: async (filePath: string): Promise<string> => {
-    return Bun.file(filePath).text();
+    return await readFile(filePath, "utf-8");
   },
   listFilesFn: async (directoryPath: string): Promise<string[]> => {
     try {
@@ -124,7 +137,7 @@ function parseDropperReference(
 export class DefaultFilesetService implements FilesetService {
   constructor(
     private readonly deps: FilesetServiceDeps = defaultFilesetServiceDeps,
-  ) { }
+  ) {}
 
   async importFromList(input: ImportFilesetInput): Promise<void> {
     const filesetsDirectory = getFilesetsDirectory(input.dataDir);

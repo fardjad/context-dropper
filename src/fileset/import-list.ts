@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import {
   assertReadableFile,
   normalizeAbsolutePath,
@@ -14,7 +15,7 @@ export type FilesetImportReadDeps = {
 export const defaultFilesetImportReadDeps: FilesetImportReadDeps = {
   assertReadableFileFn: assertReadableFile,
   readTextFileFn: async (filePath: string): Promise<string> =>
-    Bun.file(filePath).text(),
+    await readFile(filePath, "utf-8"),
   dirnameFn: path.dirname,
   normalizeAbsolutePathFn: normalizeAbsolutePath,
 };
