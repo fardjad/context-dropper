@@ -2,8 +2,16 @@
 help:
     @just --list
 
+release_targets := \
+    "bun-linux-x64:dist/context-dropper-linux-x64 " + \
+    "bun-windows-x64:dist/context-dropper-windows-x64.exe " + \
+    "bun-darwin-x64:dist/context-dropper-macos-x64 " + \
+    "bun-darwin-arm64:dist/context-dropper-macos-arm64 " + \
+    "bun-linux-arm64:dist/context-dropper-linux-arm64 " + \
+    "bun-windows-arm64:dist/context-dropper-windows-arm64.exe"
+
 # Cross-compile for all supported platforms
-build-all: build build-plugin build-linux-x64 build-windows-x64 build-macos-x64 build-macos-arm64
+build-all: build build-plugin build-release-binaries
 
 # Build the project into a single executable for the current platform
 build: sync-version
@@ -22,21 +30,23 @@ clean:
 run *args:
     bun run ./src/index.ts {{args}}
 
-# Cross-compile for Linux x64
-build-linux-x64: sync-version
-    bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile=dist/context-dropper-linux-x64
+# Cross-compile binaries for all supported release targets
+build-release-binaries: sync-version
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-# Cross-compile for Windows x64
-build-windows-x64: sync-version
-    bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile=dist/context-dropper-windows-x64.exe
+    ARTIFACTS=()
+    for TARGET_MAP in {{release_targets}}; do
+        TARGET="${TARGET_MAP%%:*}"
+        OUTFILE="${TARGET_MAP##*:}"
+        
+        echo "Building $TARGET -> $OUTFILE" >&2
+        bun build ./src/index.ts --compile --target=$TARGET --outfile=$OUTFILE >&2
+        ARTIFACTS+=("$OUTFILE")
+    done
 
-# Cross-compile for macOS x64
-build-macos-x64: sync-version
-    bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/context-dropper-macos-x64
-
-# Cross-compile for macOS arm64
-build-macos-arm64: sync-version
-    bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/context-dropper-macos-arm64
+    # Output the list of artifacts so CI pipelines can consume it
+    echo "${ARTIFACTS[*]}"
 
 # Run all tests, formatting checks, and typechecks
 test: check-fmt check-version-sync
