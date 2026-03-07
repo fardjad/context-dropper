@@ -50,11 +50,11 @@ test: fmt-check
 # Publish packages to NPM with provenance
 publish: test build-all
     bun pm pack
-    bunx npm publish *.tgz --provenance --access public
+    npm publish *.tgz --provenance --access public
     rm *.tgz
 
     cd opencode-plugin && bun pm pack
-    cd opencode-plugin && bunx npm publish *.tgz --provenance --access public
+    cd opencode-plugin && npm publish *.tgz --provenance --access public
     cd opencode-plugin && rm *.tgz
 
 # Upgrade dependencies in root and plugin
