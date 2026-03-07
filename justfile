@@ -90,6 +90,7 @@ sync-version:
     if (!(await file.exists())) process.exit(0);
 
     const version = (await file.text()).trim().replace(/^v/, "");
+    let changed = false;
     for (const path of ["package.json", "opencode-plugin/package.json"]) {
       const pJson = Bun.file(path);
       const data = await pJson.json();
@@ -98,5 +99,12 @@ sync-version:
         await Bun.write(path, JSON.stringify(data, null, 2) + "\n");
         const { stdout, stderr, exitCode } = await Bun.spawn(["dprint", "fmt", path]);
         console.log(`Synchronized ${path} to version ${version}`);
+        changed = true;
       }
+    }
+    
+    if (changed) {
+      console.log("Updating lock files...");
+      await Bun.spawn(["bun", "install"], { stdout: "inherit", stderr: "inherit" });
+      await Bun.spawn(["bun", "install"], { cwd: "opencode-plugin", stdout: "inherit", stderr: "inherit" });
     }
