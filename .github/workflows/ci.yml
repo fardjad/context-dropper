@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install global tools
+        run: bun add -g rust-just dprint
+
+      - name: Verify versions
+        run: |
+          bun --version
+          just --version
+          dprint --version
+
+      - name: Install dependencies
+        run: |
+          bun install
+          cd opencode-plugin && bun install
+
+      - name: Run tests and checks
+        run: just test
+
+      - name: Verify builds
+        run: just build-all

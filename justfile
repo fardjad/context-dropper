@@ -6,12 +6,13 @@ help:
 build-all: build build-plugin build-linux-x64 build-windows-x64 build-macos-x64 build-macos-arm64
 
 # Build the project into a single executable for the current platform
-build:
+build: sync-version
     bun build ./src/index.ts --compile --outfile=dist/context-dropper
 
 # Build the opencode plugin
-build-plugin:
-    cd opencode-plugin && bun run build
+build-plugin: sync-version
+    cd opencode-plugin
+    bun run build
 
 # Remove build artifacts
 clean:
@@ -22,30 +23,43 @@ run *args:
     bun run ./src/index.ts {{args}}
 
 # Cross-compile for Linux x64
-build-linux-x64:
+build-linux-x64: sync-version
     bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile=dist/context-dropper-linux-x64
 
 # Cross-compile for Windows x64
-build-windows-x64:
+build-windows-x64: sync-version
     bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile=dist/context-dropper-windows-x64.exe
 
 # Cross-compile for macOS x64
-build-macos-x64:
+build-macos-x64: sync-version
     bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=dist/context-dropper-macos-x64
 
 # Cross-compile for macOS arm64
-build-macos-arm64:
+build-macos-arm64: sync-version
     bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/context-dropper-macos-arm64
 
-# Run tests
-test:
+# Run all tests, formatting checks, and typechecks
+test: fmt-check
+    bunx tsc --noEmit
     bun test
-    cd opencode-plugin && bun test
+
+    cd opencode-plugin
+    bunx tsc --noEmit
+    bun test
+
+# Publish packages to NPM with provenance
+publish: test build-all
+    bun publish --provenance --access public
+
+    cd opencode-plugin
+    bun publish --provenance --access public
 
 # Upgrade dependencies in root and plugin
 upgrade:
     bun update
-    cd opencode-plugin && bun update
+
+    cd opencode-plugin
+    bun update
 
 # Format code
 fmt:
@@ -64,3 +78,22 @@ test-completion-zsh: build
     SHELL=/bin/zsh ./dist/context-dropper completion >> "$TMPDIR/.zshrc" && \
     ZDOTDIR="$TMPDIR" zsh -i; \
     rm -rf "$TMPDIR"
+
+# Synchronize version from VERSION.txt to package.json files
+sync-version:
+    #!/usr/bin/env bun
+
+    const file = Bun.file("VERSION.txt");
+    if (!(await file.exists())) process.exit(0);
+
+    const version = (await file.text()).trim().replace(/^v/, "");
+    for (const path of ["package.json", "opencode-plugin/package.json"]) {
+      const pJson = Bun.file(path);
+      const data = await pJson.json();
+      if (data.version !== version) {
+        data.version = version;
+        await Bun.write(path, JSON.stringify(data, null, 2) + "\n");
+        const { stdout, stderr, exitCode } = await Bun.spawn(["dprint", "fmt", path]);
+        console.log(`Synchronized ${path} to version ${version}`);
+      }
+    }
