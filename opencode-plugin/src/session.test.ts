@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { SessionManager } from "./session";
 
 test("SessionManager sets and gets sessions", () => {
-  const manager = new SessionManager();
+  const manager = new SessionManager(() => {});
 
   manager.setSession("test-1", {
     dropperName: "session-test-1",
@@ -16,7 +16,7 @@ test("SessionManager sets and gets sessions", () => {
 });
 
 test("SessionManager deletes sessions", () => {
-  const manager = new SessionManager();
+  const manager = new SessionManager(() => {});
 
   manager.setSession("test-1", {
     dropperName: "session-test-1",
@@ -28,7 +28,7 @@ test("SessionManager deletes sessions", () => {
 });
 
 test("SessionManager handles prune message IDs", () => {
-  const manager = new SessionManager();
+  const manager = new SessionManager(() => {});
 
   manager.setPruneMessageId("test-1", "msg-123");
   expect(manager.getPruneMessageId("test-1")).toBe("msg-123");

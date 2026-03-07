@@ -1,3 +1,5 @@
+import { type Logger } from "./logger";
+
 export interface SessionState {
   dropperName: string;
   instructions: string;
@@ -6,6 +8,11 @@ export interface SessionState {
 export class SessionManager {
   private sessionStates = new Map<string, SessionState>();
   private sessionPruneMap = new Map<string, string>();
+  private log: Logger;
+
+  constructor(log: Logger) {
+    this.log = log;
+  }
 
   setSession(sessionId: string, state: SessionState): void {
     this.sessionStates.set(sessionId, state);
@@ -16,11 +23,13 @@ export class SessionManager {
   }
 
   deleteSession(sessionId: string): void {
+    this.log(`Deleting session ${sessionId}`);
     this.sessionStates.delete(sessionId);
     this.sessionPruneMap.delete(sessionId);
   }
 
   setPruneMessageId(sessionId: string, messageId: string): void {
+    this.log(`Prune anchor set`, { sessionId, messageId });
     this.sessionPruneMap.set(sessionId, messageId);
   }
 

@@ -89,3 +89,17 @@ Once invoked, the plugin completely takes over the context management:
 4. This loop continues until all files are processed.
 
 To forcefully stop the loop before it finishes, type **"stop context-dropper"**.
+
+## Logging
+
+Plugin activity is written to OpenCode's native log system via the
+`context-dropper` service. To view logs, run OpenCode with debug-level output
+enabled:
+
+```bash
+opencode --log-level debug
+```
+
+Unexpected errors are logged at `error` level and are visible at any log level.
+Operational events (dropper lifecycle, context pruning) are logged at `info`
+level.

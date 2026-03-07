@@ -1,23 +1,28 @@
 import path from "node:path";
 import { DefaultDropperService } from "../../src/dropper/service";
 import { DefaultFilesetService } from "../../src/fileset/service";
+import { type Logger } from "./logger";
 
 export class Toolkit {
   private readonly dropperService: DefaultDropperService;
   private readonly filesetService: DefaultFilesetService;
   private readonly dataDir: string;
+  private readonly log: Logger;
 
   constructor(
     cwd: string,
+    log: Logger,
     dropperService?: DefaultDropperService,
     filesetService?: DefaultFilesetService,
   ) {
+    this.log = log;
     this.dropperService = dropperService ?? new DefaultDropperService();
     this.filesetService = filesetService ?? new DefaultFilesetService();
     this.dataDir = path.resolve(cwd, ".context-dropper");
   }
 
   async createDropper(filesetName: string, dropperName: string): Promise<void> {
+    this.log(`Creating dropper`, { dropperName, filesetName });
     await this.dropperService.create({
       dataDir: this.dataDir,
       filesetName,
@@ -26,6 +31,7 @@ export class Toolkit {
   }
 
   async removeDropper(dropperName: string): Promise<void> {
+    this.log(`Removing dropper`, { dropperName });
     try {
       await this.dropperService.remove({
         dataDir: this.dataDir,
@@ -41,6 +47,7 @@ export class Toolkit {
   }
 
   async tagProcessed(dropperName: string): Promise<void> {
+    this.log(`Tagging current file as 'processed'`, { dropperName });
     await this.dropperService.tag({
       dataDir: this.dataDir,
       dropperName,
@@ -49,6 +56,7 @@ export class Toolkit {
   }
 
   async isDone(dropperName: string): Promise<boolean> {
+    this.log(`Checking if done`, { dropperName });
     try {
       await this.dropperService.isDone({
         dataDir: this.dataDir,
@@ -61,6 +69,7 @@ export class Toolkit {
   }
 
   async nextFile(dropperName: string): Promise<void> {
+    this.log(`Advancing to next file`, { dropperName });
     await this.dropperService.next({
       dataDir: this.dataDir,
       dropperName,

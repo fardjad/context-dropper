@@ -28,7 +28,7 @@ class MockDropperService extends DefaultDropperService {
 
 test("Toolkit createDropper wraps DropperService correctly", async () => {
   const mock = new MockDropperService({} as any);
-  const toolkit = new Toolkit(process.cwd(), mock, {} as any);
+  const toolkit = new Toolkit(process.cwd(), () => {}, mock, {} as any);
 
   await toolkit.createDropper("my-fileset", "test-session");
 
@@ -39,7 +39,7 @@ test("Toolkit createDropper wraps DropperService correctly", async () => {
 
 test("Toolkit isDone wraps DropperService correctly", async () => {
   const mock = new MockDropperService({} as any);
-  const toolkit = new Toolkit(process.cwd(), mock, {} as any);
+  const toolkit = new Toolkit(process.cwd(), () => {}, mock, {} as any);
 
   const done = await toolkit.isDone("done-session");
   expect(done).toBe(true);
