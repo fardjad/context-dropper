@@ -5,7 +5,8 @@ description: Enforce module boundaries and isolated testing for CLI architecture
 
 # Module Architecture Rules
 
-These rules define source layout and dependency boundaries for repository modules.
+These rules define source layout and dependency boundaries for repository
+modules.
 
 ## 1. Module Layout
 
@@ -20,7 +21,8 @@ These rules define source layout and dependency boundaries for repository module
 
 - `src/cli` is an orchestration module and may depend on other modules.
 - Non-CLI modules must not import from `src/cli`.
-- CLI-specific types, argument parsing, and command wiring must remain in `src/cli`.
+- CLI-specific types, argument parsing, and command wiring must remain in
+  `src/cli`.
 
 ## 3. Fileset Module
 
@@ -36,13 +38,15 @@ These rules define source layout and dependency boundaries for repository module
 ## 5. File Utilities Module
 
 - Shared filesystem/path/name validation helpers must live in `src/file-utils`.
-- Filename and path normalization logic must be implemented in `src/file-utils` and reused by other modules.
+- Filename and path normalization logic must be implemented in `src/file-utils`
+  and reused by other modules.
 
 ## 6. Module Self-Containment
 
 - Each module must own its public types, errors, and helpers.
 - Avoid central shared type registries that mix unrelated module contracts.
-- Cross-module dependencies must import only what is needed from the owning module.
+- Cross-module dependencies must import only what is needed from the owning
+  module.
 
 ## 7. Error Code Ownership
 
@@ -55,11 +59,15 @@ These rules define source layout and dependency boundaries for repository module
 
 - Place tests next to implementation files inside the owning module directory.
 - Module tests must validate module behavior in isolation from CLI wiring.
-- CLI tests may validate command integration but must not replace module-isolated tests.
+- CLI tests may validate command integration but must not replace
+  module-isolated tests.
 
 ## 9. Test Scope and Seams
 
-- Do not add unit tests for trivial class declarations or constructor-only wrappers.
+- Do not add unit tests for trivial class declarations or constructor-only
+  wrappers.
 - Unit tests must not depend on the real filesystem for setup or assertions.
-- For filesystem-dependent logic, expose functional seams (dependency injection points) with defaults bound to production implementations.
-- Tests must use those seams to provide deterministic mock behavior they control.
+- For filesystem-dependent logic, expose functional seams (dependency injection
+  points) with defaults bound to production implementations.
+- Tests must use those seams to provide deterministic mock behavior they
+  control.

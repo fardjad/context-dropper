@@ -4,7 +4,8 @@ trigger: always_on
 
 # Versioning Rules
 
-These rules define how versions are managed and synchronized across the projects in this repository.
+These rules define how versions are managed and synchronized across the projects
+in this repository.
 
 ## 1. The Source of Truth
 

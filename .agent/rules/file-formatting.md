@@ -15,7 +15,8 @@ dependency, or build toolchain policy.
   - Markdown (`.md`)
   - TOML (`.toml`)
   - YAML (`.yml`, `.yaml`)
-  - JavaScript and TypeScript files (`.js`, `.jsx`, `.cjs`, `.mjs`, `.ts`, `.tsx`, `.cts`, `.mts`)
+  - JavaScript and TypeScript files (`.js`, `.jsx`, `.cjs`, `.mjs`, `.ts`,
+    `.tsx`, `.cts`, `.mts`)
   - JSON files (`.json`, `.jsonc`)
 - Formatter behavior is defined in `dprint.json`.
 
@@ -29,8 +30,10 @@ dependency, or build toolchain policy.
 ## 3. Conflict Resolution
 
 - `dprint` has priority for all file types it supports.
-- If a file type is not supported by `dprint`, use the specific formatter listed in Section 2.
-- If more than one formatter can apply and neither is `dprint`, stop and ask the user.
+- If a file type is not supported by `dprint`, use the specific formatter listed
+  in Section 2.
+- If more than one formatter can apply and neither is `dprint`, stop and ask the
+  user.
 
 ## 4. Consistency Requirements
 

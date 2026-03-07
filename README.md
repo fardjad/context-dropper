@@ -5,11 +5,58 @@ position, and tagging progress.
 
 ## Why Context Dropper?
 
-When AI coding agents explore a codebase, they typically rely on keyword or semantic search. While this works well enough for smaller tasks, there is no guarantee that the agent will actually find and examine every single file that is relevant to a larger refactor or objective.
+AI coding agents struggle with large codebases in two main ways:
 
-On the flip side, feeding an entire codebase directly into the context window is highly ineffective. As the context size grows, models tend to lose track of instructions and their reasoning capabilities degrade quickly.
+1. **Search doesn't guarantee coverage:** Agents often rely on semantic or
+   keyword search to find relevant files, and it works well in many cases. But
+   for tasks that require iterating over every file in a set, there is no
+   guarantee that search alone will find them all.
+2. **Context windows are a hard constraint:** Feeding an entire codebase into an
+   LLM at once is often simply impossible. Codebases frequently exceed the
+   model's token limit. Even when it fits, reasoning quality degrades as the
+   context grows.
 
-`context-dropper` helps bridge this gap by letting the user set up a strict, programmable processing loop. The user can build a precise list of target files (a "fileset") either manually or using other tools, and then instruct the agent to process that exact list sequentially. As the agent progresses, each file _can_ be evaluated in a **clean context** (dropping the previous file's tokens). This saves tokens and keeps the model's reasoning sharp, and guarantees coverage without hitting context limits.
+`context-dropper` solves this by enforcing strict, programmable processing
+loops.
+
+Instead of relying on search, a precise list of target files (a "fileset") is
+curated upfront - either manually or by using other tools - and the agent is
+instructed to process that exact list sequentially. As the agent moves from one
+file to the next, it can drop the previous file's tokens from memory. Each file
+is then evaluated in a **clean context**.
+
+This approach guarantees 100% file coverage, minimizes token usage, and keeps
+the model's reasoning sharp.
+
+### A Conceptual Example
+
+Consider an agent tasked with exploring a large codebase to document every piece
+of authentication logic it finds into a single file
+(`authentication-discovery.md`). Without `context-dropper`, the agent would use
+search to find files containing keywords like "auth", "login", or "session", and
+might miss files that contain authentication logic but don't match those
+keywords. With `context-dropper`, the agent instead iterates over a fixed,
+curated list of files, such as all files in a subdirectory or a filtered list
+from a test coverage report.
+
+Here is how that looks in practice:
+
+1. **The Fileset**: A discrete list of target files is provided to the tool:
+   - `src/auth/login.ts`
+   - `src/routes/api.ts`
+   - `src/middleware/session.ts`
+2. **The Dropper**: A "dropper" is created and attached to that fileset. The
+   dropper acts as a stateful bookmark that tracks exactly where the agent is in
+   the list (it can go forward or backward).
+3. **The Loop**: The AI agent is given a strict set of instructions: _"Read the
+   current file from the dropper. If authentication logic is found, append the
+   findings to `authentication-discovery.md`. Then mark the file as 'processed',
+   and move the dropper to the next file until the list is exhausted."_
+
+By explicitly unloading the previous file from its context window before moving
+the dropper, the context size remains small. This prevents the LLM from blowing
+past its token limits or suffering from degraded reasoning. In theory, an
+unlimited number of files can be processed this way.
 
 ## Installation
 
@@ -17,7 +64,9 @@ You can install `context-dropper` using one of the following methods.
 
 ### 1. Download Pre-compiled Binary (Recommended)
 
-Download the latest standalone executable for your operating system from the [Releases](https://github.com/fardjad/context-dropper/releases) page. Ensure it is executable and in your `PATH`.
+Download the latest standalone executable for your operating system from the
+[Releases](https://github.com/fardjad/context-dropper/releases) page. Ensure it
+is executable and in your `PATH`.
 
 ```bash
 chmod +x context-dropper
@@ -48,7 +97,8 @@ context-dropper --help
 
 ### 3. Build from Source (Development)
 
-To develop, compile binaries from source, or contribute to the project, please refer to the [Contributing Guide](CONTRIBUTING.md).
+To develop, compile binaries from source, or contribute to the project, please
+refer to the [Contributing Guide](CONTRIBUTING.md).
 
 ## Command Shape
 
@@ -242,9 +292,12 @@ context-dropper dropper is-done <dropperName>
 
 ## OpenCode Plugin
 
-This repository also includes a dedicated, self-contained plugin for [OpenCode](https://github.com/opencode-ai/opencode) under `opencode-plugin/`.
-The plugin natively binds to the `context-dropper` APIs and lets you iterate through filesets autonomously inside an OpenCode chat session.
-See [opencode-plugin/README.md](./opencode-plugin/README.md) for installation and usage instructions.
+This repository also includes a dedicated, self-contained plugin for
+[OpenCode](https://github.com/opencode-ai/opencode) under `opencode-plugin/`.
+The plugin natively binds to the `context-dropper` APIs and lets you iterate
+through filesets autonomously inside an OpenCode chat session. See
+[opencode-plugin/README.md](./opencode-plugin/README.md) for installation and
+usage instructions.
 
 ## Exit Codes
 
