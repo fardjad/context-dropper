@@ -9,23 +9,37 @@ A Context Dropper plugin for OpenCode, built with Bun and TypeScript. It leverag
 
 ## Installation
 
-This plugin bundles `context-dropper` directly and acts as a self-contained module.
+You can install the `context-dropper` plugin using one of the following methods.
 
-1. Build the plugin in this directory:
+### 1. Configure OpenCode (Recommended)
 
-```bash
-bun install
-bun run build
-```
+You do not need to manually install the package. OpenCode will automatically resolve and install it from the NPM registry when you add it to your configuration.
 
-2. Find or create your OpenCode global configuration file at `~/.opencode/config.json`.
-3. Add the absolute path to this directory (`opencode-plugin`) to the `plugins` array. For example:
+You can configure the plugin either globally for all projects, or locally for a single project:
+
+**Option A: Project-Level (Local)**
+
+1. Create or edit the `opencode.json` file in the root of your project.
+2. Add the package name to the `plugin` array:
 
 ```json
 {
-  "plugins": ["/Users/far/Projects/context-dropper/opencode-plugin"]
+  "plugin": ["opencode-context-dropper-plugin"]
 }
 ```
+
+**Option B: Global-Level**
+
+1. Create or edit your global OpenCode config file at `~/.config/opencode/opencode.json`.
+2. Add the package name to the `plugin` array:
+
+```json
+{
+  "plugin": ["opencode-context-dropper-plugin"]
+}
+```
+
+(Optional) If you prefer to manage the installation yourself, you can install the plugin globally using Bun (`bun install -g opencode-context-dropper-plugin`) or NPM (`npm install -g opencode-context-dropper-plugin`).
 
 ## Usage
 
@@ -60,27 +74,3 @@ Once invoked, the plugin completely takes over the context management:
 4. This loop continues until all files are processed.
 
 To forcefully stop the loop before it finishes, type **"stop context-dropper"**.
-
-## Development & Debugging
-
-To develop the plugin further, modify files under `src/`.
-
-```bash
-bun install
-# rebuild the bundle after changes
-bun run build
-```
-
-### Debugging Logs
-
-The plugin writes activity and execution state to a dedicated log file located at:
-
-```bash
-~/.opencode/context-dropper.log
-```
-
-You can monitor these logs in real-time by running the following command in your terminal:
-
-```bash
-tail -f ~/.opencode/context-dropper.log
-```

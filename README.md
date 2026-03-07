@@ -3,23 +3,44 @@
 `context-dropper` is a CLI for iterating through a fixed list of files, tracking
 position, and tagging progress.
 
-## Install and Run
+## Installation
+
+You can install `context-dropper` using one of the following methods.
+
+### 1. Download Pre-compiled Binary (Recommended)
+
+Download the latest standalone executable for your operating system from the [Releases](https://github.com/fardjad/context-dropper/releases) page. Ensure it is executable and in your `PATH`.
 
 ```bash
-bun install
+chmod +x context-dropper
+mv context-dropper /usr/local/bin/
 ```
 
-Run directly:
+### 2. Install via Package Manager
+
+You can install the package globally from NPM.
+
+**Bun:**
 
 ```bash
-bun run src/index.ts --help
+bun install -g context-dropper
 ```
 
-Or after building your own wrapper/binary, use:
+**NPM:**
+
+```bash
+npm install -g context-dropper
+```
+
+Then run it anywhere:
 
 ```bash
 context-dropper --help
 ```
+
+### 3. Build from Source (Development)
+
+To develop, compile binaries from source, or contribute to the project, please refer to the [Contributing Guide](CONTRIBUTING.md).
 
 ## Command Shape
 
