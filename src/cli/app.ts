@@ -8,6 +8,7 @@ import { formatCliError, mapErrorToExitCode } from "./error-mapper";
 import { createDropperCommand } from "./commands/dropper";
 import { createFilesetCommand } from "./commands/fileset";
 import { UsageError } from "./errors";
+import { getPackageVersion } from "../version/version";
 
 export type CliDependencies = {
   cwd?: string;
@@ -34,6 +35,7 @@ export async function runCli(
     await yargs(parseArgs)
       .scriptName("context-dropper")
       .usage("$0 [--data-dir <path>] <cmd> [args]")
+      .version(getPackageVersion())
       .option("data-dir", {
         type: "string",
         global: true,

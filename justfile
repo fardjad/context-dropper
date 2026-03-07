@@ -39,7 +39,7 @@ build-macos-arm64: sync-version
     bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=dist/context-dropper-macos-arm64
 
 # Run all tests, formatting checks, and typechecks
-test: fmt-check
+test: check-fmt check-version-sync
     bunx tsc --noEmit
     bun test
 
@@ -69,7 +69,7 @@ fmt:
     dprint fmt
 
 # Check code formatting
-fmt-check:
+check-fmt:
     dprint check
 
 # Test zsh completion interactively
@@ -108,3 +108,26 @@ sync-version:
       await Bun.spawn(["bun", "install"], { stdout: "inherit", stderr: "inherit" });
       await Bun.spawn(["bun", "install"], { cwd: "opencode-plugin", stdout: "inherit", stderr: "inherit" });
     }
+
+# Check if version in VERSION.txt matches package.json files
+check-version-sync:
+    #!/usr/bin/env bun
+
+    const file = Bun.file("VERSION.txt");
+    if (!(await file.exists())) process.exit(0);
+
+    const version = (await file.text()).trim().replace(/^v/, "");
+    let outOfSync = false;
+    for (const path of ["package.json", "opencode-plugin/package.json"]) {
+      const pJson = Bun.file(path);
+      const data = await pJson.json();
+      if (data.version !== version) {
+        console.error(`Error: Version mismatch in ${path}. Expected ${version}, found ${data.version}. Run 'just sync-version' to fix.`);
+        outOfSync = true;
+      }
+    }
+    
+    if (outOfSync) {
+      process.exit(1);
+    }
+    console.log(`Versions are in sync (${version}).`);

@@ -2,6 +2,7 @@ import { type Plugin, tool } from "@opencode-ai/plugin";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { getPackageVersion } from "../../src/version/version";
 import { SessionManager } from "./session";
 import { Toolkit } from "./toolkit";
 
@@ -59,13 +60,14 @@ const sessionManager = new SessionManager();
 const toolkit = new Toolkit(process.cwd());
 
 const ContextDropperPlugin: Plugin = async (ctx) => {
-  log("Plugin initializing...");
+  const version = getPackageVersion();
+  log(`Plugin initializing! Version: ${version}`);
   // Show a greeting toast when the plugin loads!
   setTimeout(() => {
     ctx.client.tui
       .showToast({
         body: {
-          title: "Context Dropper",
+          title: `Context Dropper v${version}`,
           message:
             "Plugin is active! Type '/drop <filesetName> <instructions>' to start.",
           variant: "success",
