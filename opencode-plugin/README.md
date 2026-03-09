@@ -58,11 +58,11 @@ Once installed, start OpenCode:
 opencode
 ```
 
-You can invoke the context dropper loop inside chat simply by using the `/drop`
-slash command:
+You can invoke the context dropper loop inside chat simply by using the
+`:context-dropper` slash command:
 
 ```text
-/drop <filesetName> <instructions>
+:context-dropper <filesetName> <instructions>
 ```
 
 - `<filesetName>` is the name of a pre-existing fileset in your project.
@@ -72,7 +72,7 @@ slash command:
 **Example:**
 
 ```text
-/drop backend-routes Please add try/catch blocks and proper logging to all async functions in this file.
+:context-dropper backend-routes Please add try/catch blocks and proper logging to all async functions in this file.
 ```
 
 ### The Automation Loop
@@ -82,7 +82,7 @@ Once invoked, the plugin completely takes over the context management:
 1. It automatically fetches the first file in the fileset and provides it to the
    agent along with your instructions.
 2. The agent performs the instructions and automatically calls the
-   `context-dropper.next` tool.
+   `context-dropper_next` tool.
 3. **Context Pruning**: When the tool is called, the file is tagged as
    processed. The plugin drops the previous file's context from the chat history
    (saving tokens), and feeds the next file to the agent.
