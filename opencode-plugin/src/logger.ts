@@ -8,12 +8,18 @@ export type Logger = (
   level?: LogLevel,
 ) => void;
 
+const toastVariant: Record<LogLevel, string> = {
+  debug: "info",
+  info: "success",
+  warn: "warning",
+  error: "error",
+};
+
 export function createLogger(
   service: string,
   client: PluginInput["client"],
 ): Logger {
   return (msg, extra, level = "info") => {
-    // Fire-and-forget: log errors are not worth surfacing to the user
     client.app
       .log({
         body: {
@@ -26,5 +32,20 @@ export function createLogger(
       .catch((e: unknown) => {
         console.error(`[${service}] Failed to send log: ${e}`);
       });
+
+    if (process.env.CONTEXT_DROPPER_TOAST_LOGS) {
+      client.tui
+        .showToast({
+          body: {
+            title: `[${service}] ${level.toUpperCase()}`,
+            message: msg,
+            variant: toastVariant[level] as any,
+            duration: 4000,
+          },
+        })
+        .catch((e: unknown) => {
+          console.error(`[${service}] Failed to show toast: ${e}`);
+        });
+    }
   };
 }

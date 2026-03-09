@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Toolkit } from "./toolkit";
+import { Dropper } from "./dropper";
 import { DefaultDropperService } from "../../src/dropper/service";
 
 // simple mock object
@@ -26,24 +26,43 @@ class MockDropperService extends DefaultDropperService {
   }
 }
 
-test("Toolkit createDropper wraps DropperService correctly", async () => {
+test("Dropper create wraps DropperService correctly", async () => {
   const mock = new MockDropperService({} as any);
-  const toolkit = new Toolkit(process.cwd(), () => {}, mock, {} as any);
+  const dropper = new Dropper(
+    process.cwd(),
+    "my-fileset",
+    "test-session",
+    () => {},
+    mock,
+  );
 
-  await toolkit.createDropper("my-fileset", "test-session");
+  await dropper.create();
 
   expect(mock.creates.length).toBe(1);
   expect(mock.creates[0].filesetName).toBe("my-fileset");
   expect(mock.creates[0].dropperName).toBe("test-session");
 });
 
-test("Toolkit isDone wraps DropperService correctly", async () => {
+test("Dropper isDone wraps DropperService correctly", async () => {
   const mock = new MockDropperService({} as any);
-  const toolkit = new Toolkit(process.cwd(), () => {}, mock, {} as any);
 
-  const done = await toolkit.isDone("done-session");
+  const doneDropper = new Dropper(
+    process.cwd(),
+    "my-fileset",
+    "done-session",
+    () => {},
+    mock,
+  );
+  const done = await doneDropper.isDone();
   expect(done).toBe(true);
 
-  const notDone = await toolkit.isDone("not-done-session");
+  const notDoneDropper = new Dropper(
+    process.cwd(),
+    "my-fileset",
+    "not-done-session",
+    () => {},
+    mock,
+  );
+  const notDone = await notDoneDropper.isDone();
   expect(notDone).toBe(false);
 });

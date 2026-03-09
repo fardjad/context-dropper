@@ -1,38 +1,66 @@
-import { type Plugin, tool } from "@opencode-ai/plugin";
+import {
+  type Hooks,
+  type Plugin,
+  tool,
+} from "@opencode-ai/plugin";
 import { getPackageVersion } from "../../src/version/version";
-import { createLogger } from "./logger";
+import { type Logger, createLogger } from "./logger";
+import { MessageHandler } from "./message-handler";
 import { SessionManager } from "./session";
-import { Toolkit } from "./toolkit";
+import { DefaultDropperService } from "../../src/dropper/service";
 
-const ContextDropperPlugin: Plugin = async (ctx) => {
-  const version = getPackageVersion();
-  const log = createLogger("context-dropper", ctx.client);
-  const toolkit = new Toolkit(ctx.worktree, log);
-  const sessionManager = new SessionManager(log);
+class Program {
+  private readonly messageHandler: MessageHandler;
 
-  log(`Plugin initializing! Version: ${version}`);
+  constructor(
+    private readonly sessionManager: SessionManager,
+    private readonly log: Logger,
+  ) {
+    this.messageHandler = new MessageHandler();
 
-  // Show a greeting toast when the plugin loads!
-  setTimeout(() => {
-    ctx.client.tui
-      .showToast({
-        body: {
-          title: `Context Dropper v${version}`,
-          message:
-            "Plugin is active! Type '/drop <filesetName> <instructions>' to start.",
-          variant: "success",
-          duration: 5000,
-        },
-      })
-      .catch((e: any) =>
-        log("Failed to show toast", { error: String(e) }, "warn"),
-      );
-    log("Initialization complete", { worktree: ctx.worktree, version });
-  }, 1000); // Slight delay to ensure TUI is fully mounted
+    this.messageHandler.use(
+      ":context-dropper <string:filesetName> <string:instructions>",
+      async (
+        { filesetName, instructions },
+        { sessionId, messageId, input },
+      ) => {
+        this.log(`Processing :context-dropper command`, { sessionId });
+        const session = await this.sessionManager.createSession(
+          sessionId,
+          String(filesetName),
+          String(instructions),
+        );
+        try {
+          const prompt = await session.getPrompt();
+          if (messageId) session.pruneMessageId = messageId;
 
-  return {
-    tool: {
-      "context-dropper": tool({
+          return prompt;
+        } catch (error: any) {
+          this.log(
+            `Error handling :context-dropper command`,
+            { error: error.message },
+            "error",
+          );
+          return `Error handling :context-dropper: ${error.message}`;
+        }
+      },
+    );
+  }
+
+  private getActiveSession(messages: any[]) {
+    if (!messages || messages.length === 0) return;
+    const firstMessage = messages[0];
+    if (!firstMessage || !firstMessage.info) return;
+
+    const sessionId = firstMessage.info.sessionID;
+    if (!sessionId) return;
+
+    return this.sessionManager.getSession(sessionId);
+  }
+
+  private get tools() {
+    return {
+      "context-dropper_init": tool({
         description: "Initializes the context-dropper task.",
         args: {
           filesetName: tool.schema
@@ -43,171 +71,90 @@ const ContextDropperPlugin: Plugin = async (ctx) => {
             .describe("Instructions on what to do with the files"),
         },
         execute: async (args, context) => {
-          const dropperName = `session-${context.sessionID}`;
+          const { filesetName, instructions } = args;
+          const sessionId = context.sessionID;
 
-          sessionManager.setSession(context.sessionID, {
-            dropperName,
-            instructions: args.instructions,
-          });
+          const session = await this.sessionManager.createSession(
+            sessionId,
+            filesetName,
+            instructions,
+          );
 
           try {
-            await toolkit.removeDropper(dropperName);
-            await toolkit.createDropper(args.filesetName, dropperName);
-
-            return await toolkit.getFilePrompt(
-              dropperName,
-              args.instructions,
-              false,
-            );
+            return await session.getPrompt();
           } catch (error: any) {
-            log(`Error in tool execution`, { error: error.message }, "error");
-            return `Error initializing context-dropper: ${error.message}`;
+            this.log(
+              `Error in context-dropper_init`,
+              { error: error.message },
+              "error",
+            );
+            return `Error in context-dropper_init: ${error.message}`;
           }
         },
       }),
-      "context-dropper.next": tool({
+      "context-dropper_next": tool({
         description:
           "Call this tool when you have finished processing the current file to save state, prune context, and fetch the next file.",
         args: {},
         execute: async (args, context) => {
           const sessionId = context.sessionID;
-          const state = sessionManager.getSession(sessionId);
+          const session = this.sessionManager.getSession(sessionId);
 
-          if (!state) {
+          if (!session) {
             return "No active context-dropper session found. Please initialize one first.";
           }
 
           try {
-            await toolkit.tagProcessed(state.dropperName);
+            await session.tagProcessed();
 
-            const isDone = await toolkit.isDone(state.dropperName);
+            const isDone = await session.isDone();
 
             if (isDone) {
-              log(`Session completed`, { dropperName: state.dropperName });
-              sessionManager.deleteSession(sessionId);
+              this.log(`Session completed`, {
+                dropperName: session.dropperName,
+              });
+              this.sessionManager.deleteSession(sessionId);
               return `[Context-Dropper: All files have been processed. Task complete.]`;
             }
 
-            await toolkit.nextFile(state.dropperName);
+            await session.nextFile();
 
-            const prompt = await toolkit.getFilePrompt(
-              state.dropperName,
-              state.instructions,
-              true,
-            );
+            const prompt = await session.getPrompt();
 
             // Mark this tool message as the start of the new context for pruning
-            sessionManager.setPruneMessageId(sessionId, context.messageID);
+            session.pruneMessageId = context.messageID;
 
             return prompt;
           } catch (error: any) {
-            log(
-              `Error during 'next' processing`,
+            this.log(
+              `Error in context-dropper_next`,
               { error: error.message },
               "error",
             );
-            return `[Context-Dropper Error: ${error.message}]`;
+            return `[context-dropper_next error: ${error.message}]`;
           }
         },
       }),
-    },
-    "chat.message": async (input, output) => {
-      const sessionId = input.sessionID;
+    };
+  }
 
-      for (const part of output.parts) {
-        if (part.type === "text") {
-          const text = part.text.trim().toLowerCase();
-          log(`Processing message chunk`, {
-            sessionId,
-            startsWithDrop: text.startsWith("/drop"),
-          });
+  get plugin() {
+    return {
+      tool: this.tools,
+      "chat.message": this.messageHandler.handle,
+      "experimental.chat.messages.transform": async (_input, output) => {
+        const activeSession = this.getActiveSession(output.messages);
+        activeSession?.pruneMessages(output.messages);
+      },
+    } satisfies Hooks;
+  }
+}
 
-          if (text.startsWith("/drop ")) {
-            const originalText = part.text.trim();
-            const match = originalText.match(/^\/drop\s+([^\s]+)\s+(.+)$/is);
+export default (async (ctx) => {
+  const log = createLogger("context-dropper", ctx.client);
+  log(`Plugin initializing! Version: ${getPackageVersion()}`);
 
-            if (match) {
-              const filesetName = match[1] || "";
-              const instructions = match[2] || "";
-              const dropperName = `session-${sessionId}`;
-
-              sessionManager.setSession(sessionId, {
-                dropperName,
-                instructions,
-              });
-
-              try {
-                await toolkit.removeDropper(dropperName);
-                await toolkit.createDropper(filesetName, dropperName);
-
-                const prompt = await toolkit.getFilePrompt(
-                  dropperName,
-                  instructions,
-                  false,
-                );
-                part.text = prompt;
-
-                if (output.message?.id) {
-                  sessionManager.setPruneMessageId(
-                    sessionId,
-                    output.message.id,
-                  );
-                }
-              } catch (error: any) {
-                log(
-                  `Error starting context-dropper via /drop`,
-                  {
-                    error: error.message,
-                  },
-                  "error",
-                );
-                part.text = `Error starting context-dropper: ${error.message}`;
-              }
-            } else {
-              part.text =
-                "Invalid command format. Please use: `/drop <filesetName> <instructions>`";
-            }
-            continue;
-          }
-
-          if (
-            text.includes("stop context-dropper") ||
-            text.includes("stop dropping")
-          ) {
-            sessionManager.deleteSession(sessionId);
-            part.text +=
-              "\n\n[Context-Dropper: Process stopped manually by user. State cleared.]";
-            continue;
-          }
-        }
-      }
-    },
-    "experimental.chat.messages.transform": async (input, output) => {
-      if (!output.messages || output.messages.length === 0) return;
-      const firstMessage = output.messages[0];
-      if (!firstMessage || !firstMessage.info) return;
-
-      const sessionId = firstMessage.info.sessionID;
-      if (!sessionId) return;
-
-      const pruneStartId = sessionManager.getPruneMessageId(sessionId);
-      if (pruneStartId) {
-        const totalBefore = output.messages.length;
-        const index = output.messages.findIndex(
-          (m) => m.info && m.info.id === pruneStartId,
-        );
-        if (index !== -1) {
-          output.messages.splice(0, index);
-          log(`Context pruned`, {
-            sessionId,
-            removed: index,
-            totalBefore,
-            remaining: output.messages.length,
-          });
-        }
-      }
-    },
-  };
-};
-
-export default ContextDropperPlugin;
+  const dropperService = new DefaultDropperService();
+  const sessionManager = new SessionManager(ctx.worktree, log, dropperService);
+  return new Program(sessionManager, log).plugin;
+}) satisfies Plugin;
