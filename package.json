@@ -1,6 +1,6 @@
 {
   "name": "context-dropper",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "description": "CLI for iterating through a fixed list of files, tracking position, and tagging progress within an AI agent's session.",
   "author": {
     "name": "Fardjad Davari",

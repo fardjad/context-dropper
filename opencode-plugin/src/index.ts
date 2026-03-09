@@ -1,8 +1,4 @@
-import {
-  type Hooks,
-  type Plugin,
-  tool,
-} from "@opencode-ai/plugin";
+import { type Hooks, type Plugin, tool } from "@opencode-ai/plugin";
 import { getPackageVersion } from "../../src/version/version";
 import { type Logger, createLogger } from "./logger";
 import { MessageHandler } from "./message-handler";
