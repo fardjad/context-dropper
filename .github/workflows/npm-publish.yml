@@ -1,4 +1,4 @@
-name: NPM Publish
+name: npm-publish
 
 on:
   release:
@@ -27,7 +27,7 @@ jobs:
           ref: ${{ inputs.tag || github.event.release.tag_name || github.ref }}
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@main
         with:
           bun-version: latest
 
@@ -63,7 +63,7 @@ jobs:
           fi
 
           case "$PACKAGE" in
-            context-dropper) just publish-root ;;
+            context-dropper) just publish-cli ;;
             opencode-context-dropper-plugin) just publish-plugin ;;
             *) echo "Unsupported package: $PACKAGE" >&2; exit 1 ;;
           esac

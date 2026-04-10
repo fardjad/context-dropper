@@ -1,8 +1,8 @@
-name: GitHub Release
+name: github-release
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["ci"]
     branches: [main]
     types:
       - completed

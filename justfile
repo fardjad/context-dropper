@@ -64,7 +64,7 @@ test-plugin: check-fmt
 test: test-cli test-plugin
 
 # Publish the root package to NPM with provenance
-publish-root: test build-cli
+publish-cli: test-cli build-cli
     bun pm pack
     npm publish *.tgz --provenance --access public
     rm *.tgz
@@ -76,7 +76,7 @@ publish-plugin: test build-plugin
     cd opencode-plugin && rm *.tgz
 
 # Publish all packages to NPM with provenance
-publish: publish-root publish-plugin
+publish: publish-cli publish-plugin
 
 # Format code
 fmt:
