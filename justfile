@@ -14,11 +14,11 @@ release_targets := \
 build-all: build build-plugin build-release-binaries
 
 # Build the project into a single executable for the current platform
-build: sync-version
+build:
     bun build ./src/index.ts --compile --outfile=dist/context-dropper
 
 # Build the opencode plugin
-build-plugin: sync-version
+build-plugin:
     cd opencode-plugin
     bun run build
 
@@ -28,18 +28,18 @@ clean:
 
 # Run the CLI
 run *args:
-    bun run ./src/index.ts {{args}}
+    bun run ./src/index.ts {{ args }}
 
 # Cross-compile binaries for all supported release targets
-build-release-binaries: sync-version
+build-release-binaries:
     #!/usr/bin/env bash
     set -euo pipefail
 
     ARTIFACTS=()
-    for TARGET_MAP in {{release_targets}}; do
+    for TARGET_MAP in {{ release_targets }}; do
         TARGET="${TARGET_MAP%%:*}"
         OUTFILE="${TARGET_MAP##*:}"
-        
+
         echo "Building $TARGET -> $OUTFILE" >&2
         bun build ./src/index.ts --compile --target=$TARGET --outfile=$OUTFILE >&2
         ARTIFACTS+=("$OUTFILE")
@@ -49,7 +49,7 @@ build-release-binaries: sync-version
     echo "${ARTIFACTS[*]}"
 
 # Run all tests, formatting checks, and typechecks
-test: check-fmt check-version-sync
+test: check-fmt
     bunx tsc --noEmit
     bun test
 
@@ -57,15 +57,20 @@ test: check-fmt check-version-sync
     bunx tsc --noEmit
     bun test
 
-# Publish packages to NPM with provenance
-publish: test build-all
+# Publish the root package to NPM with provenance
+publish-root: test build
     bun pm pack
     npm publish *.tgz --provenance --access public
     rm *.tgz
 
+# Publish the OpenCode plugin package to NPM with provenance
+publish-plugin: test build-plugin
     cd opencode-plugin && bun pm pack
     cd opencode-plugin && npm publish *.tgz --provenance --access public
     cd opencode-plugin && rm *.tgz
+
+# Publish all packages to NPM with provenance
+publish: publish-root publish-plugin
 
 # Upgrade dependencies in root and plugin
 upgrade:
@@ -91,53 +96,3 @@ test-completion-zsh: build
     SHELL=/bin/zsh ./dist/context-dropper completion >> "$TMPDIR/.zshrc" && \
     ZDOTDIR="$TMPDIR" zsh -i; \
     rm -rf "$TMPDIR"
-
-# Synchronize version from VERSION.txt to package.json files
-sync-version:
-    #!/usr/bin/env bun
-
-    const file = Bun.file("VERSION.txt");
-    if (!(await file.exists())) process.exit(0);
-
-    const version = (await file.text()).trim().replace(/^v/, "");
-    let changed = false;
-    for (const path of ["package.json", "opencode-plugin/package.json"]) {
-      const pJson = Bun.file(path);
-      const data = await pJson.json();
-      if (data.version !== version) {
-        data.version = version;
-        await Bun.write(path, JSON.stringify(data, null, 2) + "\n");
-        const { stdout, stderr, exitCode } = await Bun.spawn(["dprint", "fmt", path]);
-        console.log(`Synchronized ${path} to version ${version}`);
-        changed = true;
-      }
-    }
-    
-    if (changed) {
-      console.log("Updating lock files...");
-      await Bun.spawn(["bun", "install"], { stdout: "inherit", stderr: "inherit" });
-      await Bun.spawn(["bun", "install"], { cwd: "opencode-plugin", stdout: "inherit", stderr: "inherit" });
-    }
-
-# Check if version in VERSION.txt matches package.json files
-check-version-sync:
-    #!/usr/bin/env bun
-
-    const file = Bun.file("VERSION.txt");
-    if (!(await file.exists())) process.exit(0);
-
-    const version = (await file.text()).trim().replace(/^v/, "");
-    let outOfSync = false;
-    for (const path of ["package.json", "opencode-plugin/package.json"]) {
-      const pJson = Bun.file(path);
-      const data = await pJson.json();
-      if (data.version !== version) {
-        console.error(`Error: Version mismatch in ${path}. Expected ${version}, found ${data.version}. Run 'just sync-version' to fix.`);
-        outOfSync = true;
-      }
-    }
-    
-    if (outOfSync) {
-      process.exit(1);
-    }
-    console.log(`Versions are in sync (${version}).`);

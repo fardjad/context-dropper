@@ -11,30 +11,65 @@ jobs:
   check-version-and-release:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - name: context-dropper
+            directory: .
+            tag_prefix: context-dropper-v
+            build_binaries: true
+          - name: opencode-context-dropper-plugin
+            directory: opencode-plugin
+            tag_prefix: opencode-context-dropper-plugin-v
+            build_binaries: false
     steps:
       - uses: actions/checkout@main
         with:
           fetch-depth: 0
           filter: blob:none
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Check version
         id: check_version
         run: |
-          FILE_VERSION=$(cat VERSION.txt)
+          PACKAGE_DIR="${{ matrix.package.directory }}"
+          TAG_PREFIX="${{ matrix.package.tag_prefix }}"
+
+          FILE_VERSION=$(cd "${PACKAGE_DIR}" && bun pm pkg get version)
+          FILE_VERSION="${FILE_VERSION%\"}"
+          FILE_VERSION="${FILE_VERSION#\"}"
           FILE_VERSION="${FILE_VERSION#v}"
 
-          TAG_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          TAG_VERSION="${TAG_VERSION#v}"
+          TAG_VERSION="0.0.0"
+          TAG=$(git tag --list "${TAG_PREFIX}*" --sort=-v:refname | head -n1)
+
+          if [ -n "$TAG" ]; then
+            TAG_VERSION="${TAG#${TAG_PREFIX}}"
+          else
+            LEGACY_TAG=$(git tag --list "v*" --sort=-v:refname | head -n1)
+            if [ -n "$LEGACY_TAG" ]; then
+              TAG_VERSION="${LEGACY_TAG#v}"
+            fi
+          fi
 
           if [ "$(printf '%s\n' "$TAG_VERSION" "$FILE_VERSION" | sort -V | tail -n1)" = "$FILE_VERSION" ] && [ "$FILE_VERSION" != "$TAG_VERSION" ]; then
-            echo "VERSION in file is greater than the latest tag."
+            echo "${{ matrix.package.name }} version is greater than the latest package tag."
             echo "version_changed=true" >> $GITHUB_OUTPUT
           else
-            echo "VERSION is not greater than the latest tag."
+            echo "${{ matrix.package.name }} version is not greater than the latest package tag."
             echo "version_changed=false" >> $GITHUB_OUTPUT
           fi
 
           echo "version=$FILE_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${TAG_PREFIX}${FILE_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Configure Git
         if: steps.check_version.outputs.version_changed == 'true'
@@ -44,26 +79,20 @@ jobs:
         if: steps.check_version.outputs.version_changed == 'true'
         id: create_tag
         run: |
-          TAG="v${{ steps.check_version.outputs.version }}"
+          TAG="${{ steps.check_version.outputs.tag }}"
 
           if git rev-parse $TAG >/dev/null 2>&1; then
             echo "Tag $TAG already exists, skipping..."
             echo "tag_exists=true" >> $GITHUB_OUTPUT
           else
-            git tag -a $TAG -m "Release $TAG"
+            git tag -a $TAG -m "Release ${{ matrix.package.name }} ${{ steps.check_version.outputs.version }}"
             git push origin $TAG
             echo "tag_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Setup Bun
-        if: steps.check_version.outputs.version_changed == 'true' && steps.create_tag.outputs.tag_exists != 'true'
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
       - name: Build latest binaries
         id: build_binaries
-        if: steps.check_version.outputs.version_changed == 'true' && steps.create_tag.outputs.tag_exists != 'true'
+        if: steps.check_version.outputs.version_changed == 'true' && steps.create_tag.outputs.tag_exists != 'true' && matrix.package.build_binaries
         run: |
           bun add -g rust-just dprint
           bun install
@@ -73,6 +102,23 @@ jobs:
       - name: Create release
         if: steps.check_version.outputs.version_changed == 'true' && steps.create_tag.outputs.tag_exists != 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          TAG: "v${{ steps.check_version.outputs.version }}"
-        run: gh release create "${TAG}" ${{ steps.build_binaries.outputs.artifacts }} --generate-notes
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.check_version.outputs.tag }}
+        run: |
+          if [ -n "${{ steps.build_binaries.outputs.artifacts }}" ]; then
+            gh release create "${TAG}" ${{ steps.build_binaries.outputs.artifacts }} \
+              --title "${{ matrix.package.name }} ${{ steps.check_version.outputs.version }}" \
+              --generate-notes
+          else
+            gh release create "${TAG}" \
+              --title "${{ matrix.package.name }} ${{ steps.check_version.outputs.version }}" \
+              --generate-notes
+          fi
+
+      - name: Trigger NPM publish
+        if: steps.check_version.outputs.version_changed == 'true' && steps.create_tag.outputs.tag_exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.check_version.outputs.tag }}
+          PACKAGE: ${{ matrix.package.name }}
+        run: gh workflow run npm-publish.yml --ref main -f "tag=${TAG}" -f "package=${PACKAGE}"

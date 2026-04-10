@@ -4,13 +4,22 @@ trigger: always_on
 
 # Versioning Rules
 
-These rules define how versions are managed and synchronized across the projects
-in this repository.
+These rules define how versions are managed across the projects in this
+repository.
 
-## 1. The Source of Truth
+## 1. Independent Package Versions
 
-- **`VERSION.txt` File**: The `VERSION.txt` file located at the root of the
-  repository is the definitive and single source of truth for the project's
-  current version.
-- **Tag and Package Matching**: The version defined in `VERSION.txt` dictates
-  all versions in package.json files.
+- Each package's own `package.json` file is the source of truth for that
+  package's version.
+- The root package version is defined only in `package.json`.
+- The OpenCode plugin package version is defined only in
+  `opencode-plugin/package.json`.
+- Package versions must not be synchronized through a shared version file.
+
+## 2. Version Bumps
+
+- Use `bun pm version <increment> --no-git-tag-version` from the package
+  directory whose version is being changed.
+- Dependency maintenance for a package must bump only that package's version.
+- Release tags must include the package identity so independently versioned
+  packages do not collide.

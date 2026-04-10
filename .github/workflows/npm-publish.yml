@@ -3,6 +3,16 @@ name: NPM Publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: false
+        type: string
+      package:
+        description: Package to publish
+        required: false
+        type: string
 
 jobs:
   publish:
@@ -13,6 +23,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@main
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name || github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -34,4 +46,24 @@ jobs:
           cd opencode-plugin && bun install
 
       - name: Publish
-        run: just publish
+        env:
+          INPUT_PACKAGE: ${{ inputs.package }}
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          PACKAGE="${INPUT_PACKAGE}"
+          TAG="${INPUT_TAG:-$RELEASE_TAG}"
+
+          if [ -z "$PACKAGE" ]; then
+            case "$TAG" in
+              context-dropper-v*) PACKAGE="context-dropper" ;;
+              opencode-context-dropper-plugin-v*) PACKAGE="opencode-context-dropper-plugin" ;;
+              *) echo "Unable to infer package from tag: $TAG" >&2; exit 1 ;;
+            esac
+          fi
+
+          case "$PACKAGE" in
+            context-dropper) just publish-root ;;
+            opencode-context-dropper-plugin) just publish-plugin ;;
+            *) echo "Unsupported package: $PACKAGE" >&2; exit 1 ;;
+          esac
