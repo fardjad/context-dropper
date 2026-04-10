@@ -5,9 +5,6 @@ on:
   schedule:
     - cron: "0 0 * * *"
 
-permissions:
-  contents: read
-
 jobs:
   update-root:
     runs-on: ubuntu-latest
@@ -36,10 +33,9 @@ jobs:
         with:
           source-branch: automatic-bun-update-root
           github-token: ${{ steps.app-token.outputs.token }}
-          upgrade-options: --latest --no-progress
           verify-script: |
-            just test
-            just build-all
+            just test-cli
+            just build-cli
           post-update-commands: |
             bun pm version patch --no-git-tag-version
             dprint fmt
@@ -72,11 +68,10 @@ jobs:
           source-branch: automatic-bun-update-opencode-plugin
           github-token: ${{ steps.app-token.outputs.token }}
           working-directory: opencode-plugin
-          upgrade-options: --latest --no-progress
           verify-script: |
             cd ..
-            just test
-            just build-all
+            just test-plugin
+            just build-plugin
           post-update-commands: |
             bun pm version patch --no-git-tag-version
             cd ..

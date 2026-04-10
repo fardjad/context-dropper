@@ -11,16 +11,18 @@ release_targets := \
     "bun-windows-arm64:dist/context-dropper-windows-arm64.exe"
 
 # Cross-compile for all supported platforms
-build-all: build build-plugin build-release-binaries
+build-all: build build-release-binaries
 
-# Build the project into a single executable for the current platform
-build:
+# Build all package artifacts for the current platform
+build: build-cli build-plugin
+
+# Build the CLI into a single executable for the current platform
+build-cli:
     bun build ./src/index.ts --compile --outfile=dist/context-dropper
 
 # Build the opencode plugin
 build-plugin:
-    cd opencode-plugin
-    bun run build
+    cd opencode-plugin && bun run build
 
 # Remove build artifacts
 clean:
@@ -48,17 +50,21 @@ build-release-binaries:
     # Output the list of artifacts so CI pipelines can consume it
     echo "${ARTIFACTS[*]}"
 
-# Run all tests, formatting checks, and typechecks
-test: check-fmt
+# Run CLI tests, formatting checks, and typechecks
+test-cli: check-fmt
     bunx tsc --noEmit
-    bun test
+    find src -name '*.test.ts' -print0 | xargs -0 bun test
 
-    cd opencode-plugin
-    bunx tsc --noEmit
-    bun test
+# Run OpenCode plugin tests, formatting checks, and typechecks
+test-plugin: check-fmt
+    cd opencode-plugin && bunx tsc --noEmit
+    cd opencode-plugin && find src -name '*.test.ts' -print0 | xargs -0 bun test
+
+# Run all tests, formatting checks, and typechecks
+test: test-cli test-plugin
 
 # Publish the root package to NPM with provenance
-publish-root: test build
+publish-root: test build-cli
     bun pm pack
     npm publish *.tgz --provenance --access public
     rm *.tgz
@@ -72,13 +78,6 @@ publish-plugin: test build-plugin
 # Publish all packages to NPM with provenance
 publish: publish-root publish-plugin
 
-# Upgrade dependencies in root and plugin
-upgrade:
-    bun update
-
-    cd opencode-plugin
-    bun update
-
 # Format code
 fmt:
     dprint fmt
@@ -88,7 +87,7 @@ check-fmt:
     dprint check
 
 # Test zsh completion interactively
-test-completion-zsh: build
+test-completion-zsh: build-cli
     @echo "Starting a subshell to test zsh completion. Type 'exit' to leave."
     @TMPDIR=$(mktemp -d) && \
     echo 'export PATH="'$(pwd)'/dist:$PATH"' > "$TMPDIR/.zshrc" && \
