@@ -9,12 +9,12 @@ repository.
 
 ## 1. Independent Package Versions
 
-- Each package's own `package.json` file is the source of truth for that
-  package's version.
-- The root package version is defined only in `package.json`.
-- The OpenCode plugin package version is defined only in
-  `opencode-plugin/package.json`.
-- Package versions must not be synchronized through a shared version file.
+- There are two separate packages in this repository, the CLI and the 
+  opencode-plugin. They both have their own versions. 
+- This repository follows semantic versioning. 
+- Before version 1.x.x, Minor versions must be in sync. For >=1.x.x, major 
+  versions must be kept in sync.
+- When upgrading dependencies, just bump the patch versions. 
 
 ## 2. Version Bumps
 
