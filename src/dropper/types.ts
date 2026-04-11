@@ -8,6 +8,13 @@ export type DropperPointerState = {
   total: number;
 };
 
+export type DropperCurrentState = {
+  name: string;
+  filesetName: string;
+  currentFile: string | null;
+  pointer: DropperPointerState;
+};
+
 export type DropperRecord = {
   name: string;
   filesetName: string;
@@ -30,6 +37,11 @@ export type CreateDropperInput = {
 };
 
 export type ShowDropperInput = {
+  dataDir: string;
+  dropperName: string;
+};
+
+export type CurrentDropperInput = {
   dataDir: string;
   dropperName: string;
 };

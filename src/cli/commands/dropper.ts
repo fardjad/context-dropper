@@ -1,5 +1,6 @@
 import type { CommandModule } from "yargs";
 import type { DropperService } from "../../dropper/service";
+import { createDropperCurrentCommand } from "./dropper/current";
 import { createDropperCreateCommand } from "./dropper/create";
 import { createDropperDumpCommand } from "./dropper/dump";
 import { createDropperIsDoneCommand } from "./dropper/is-done";
@@ -30,6 +31,7 @@ export function createDropperCommand(deps: DropperCommandDeps): CommandModule {
 
       return yargs
         .command(createDropperCreateCommand(deps))
+        .command(createDropperCurrentCommand(deps))
         .command(createDropperShowCommand(deps))
         .command(createDropperNextCommand(deps))
         .command(createDropperPreviousCommand(deps))

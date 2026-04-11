@@ -4,22 +4,17 @@ trigger: always_on
 
 # Versioning Rules
 
-These rules define how versions are managed across the projects in this
-repository.
+These rules define how versions are managed for this repository.
 
-## 1. Independent Package Versions
+## 1. Package Version
 
-- There are two separate packages in this repository, the CLI and the 
-  opencode-plugin. They both have their own versions. 
-- This repository follows semantic versioning. 
-- Before version 1.x.x, Minor versions must be in sync. For >=1.x.x, major 
-  versions must be kept in sync.
-- When upgrading dependencies, just bump the patch versions. 
+- This repository publishes a package: `context-dropper`.
+- This repository follows semantic versioning.
+- When releasing a new version, analyze the changes and bump the version 
+  according to semantic versioning rules.
 
 ## 2. Version Bumps
 
-- Use `bun pm version <increment> --no-git-tag-version` from the package
-  directory whose version is being changed.
-- Dependency maintenance for a package must bump only that package's version.
-- Release tags must include the package identity so independently versioned
-  packages do not collide.
+- Use `bun pm version <increment> --no-git-tag-version` from the repository
+  root.
+- Release tags must use the `v<version>` format.

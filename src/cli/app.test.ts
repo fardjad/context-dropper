@@ -4,7 +4,9 @@ import { Writable } from "node:stream";
 import { DropperAtStartError, DropperExhaustedError } from "../dropper/errors";
 import type { DropperService } from "../dropper/service";
 import type {
+  CurrentDropperInput,
   CreateDropperInput,
+  DropperCurrentState,
   DropperEntry,
   DropperRecord,
   DumpDropperInput,
@@ -28,6 +30,11 @@ import type {
   RemoveFilesetInput,
   ShowFilesetInput,
 } from "../fileset/types";
+import type {
+  InitOpenCodeScaffoldInput,
+  InitOpenCodeScaffoldResult,
+  OpenCodeScaffoldService,
+} from "./opencode/service";
 import { type CliDependencies, runCli } from "./app";
 
 class MemoryWritable extends Writable {
@@ -92,6 +99,16 @@ function createDropperService(
   return {
     create: async (_input: CreateDropperInput) => {},
     show: async (_input: ShowDropperInput): Promise<string> => "",
+    current: async (
+      _input: CurrentDropperInput,
+    ): Promise<DropperCurrentState> => {
+      return {
+        name: "dropper",
+        filesetName: "fileset",
+        currentFile: null,
+        pointer: { currentIndex: null, total: 0 },
+      };
+    },
     next: async (_input: NextDropperInput) => {},
     previous: async (_input: PreviousDropperInput) => {},
     tag: async (_input: TagDropperInput) => {},
@@ -113,6 +130,22 @@ function createDropperService(
       };
     },
     isDone: async (_input: IsDoneDropperInput): Promise<boolean> => true,
+    ...overrides,
+  };
+}
+
+function createOpenCodeScaffoldService(
+  overrides: Partial<OpenCodeScaffoldService> = {},
+): OpenCodeScaffoldService {
+  return {
+    init: async (
+      _input: InitOpenCodeScaffoldInput,
+    ): Promise<InitOpenCodeScaffoldResult> => {
+      return {
+        configPath: "/repo/opencode.jsonc",
+        writtenFiles: ["/repo/opencode.jsonc"],
+      };
+    },
     ...overrides,
   };
 }
@@ -151,6 +184,16 @@ describe("CLI command skeleton", () => {
       "bun",
       "context-dropper",
       "dropper",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+  });
+
+  test("opencode without subcommand shows usage and exits successfully", async () => {
+    const { exitCode, stderr } = await runCliWithCapturedOutput([
+      "bun",
+      "context-dropper",
+      "opencode",
     ]);
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
@@ -276,6 +319,66 @@ describe("CLI command skeleton", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toBe("/src/a.ts\n/src/b.ts\n");
+  });
+
+  test("opencode init passes model overrides to the scaffold service", async () => {
+    let initInput: InitOpenCodeScaffoldInput | undefined;
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      [
+        "bun",
+        "context-dropper",
+        "opencode",
+        "init",
+        "--controller-model",
+        "openai/gpt-5",
+        "--worker-model",
+        "openai/gpt-5-mini",
+      ],
+      {
+        cwd: "/repo",
+        openCodeScaffoldService: createOpenCodeScaffoldService({
+          init: async (
+            input: InitOpenCodeScaffoldInput,
+          ): Promise<InitOpenCodeScaffoldResult> => {
+            initInput = input;
+            return {
+              configPath: "/repo/opencode.jsonc",
+              writtenFiles: [
+                "/repo/opencode.jsonc",
+                "/repo/.opencode/commands/context-dropper.md",
+              ],
+            };
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(initInput).toEqual({
+      cwd: "/repo",
+      controllerModel: "openai/gpt-5",
+      workerModel: "openai/gpt-5-mini",
+    });
+    expect(stdout).toContain("Initialized OpenCode scaffold in /repo");
+    expect(stdout).toContain("/repo/opencode.jsonc");
+  });
+
+  test("opencode init reports scaffold service errors", async () => {
+    const { exitCode, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "opencode", "init"],
+      {
+        cwd: "/repo",
+        openCodeScaffoldService: createOpenCodeScaffoldService({
+          init: async (): Promise<InitOpenCodeScaffoldResult> => {
+            throw new AppError("Cannot initialize OpenCode scaffold");
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Cannot initialize OpenCode scaffold");
   });
 
   test("fileset import resolves list entries relative to list file directory", async () => {
@@ -446,6 +549,30 @@ describe("CLI command skeleton", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toBe(`${JSON.stringify(dumpRecord, null, 2)}\n`);
+  });
+
+  test("dropper current prints compact JSON", async () => {
+    const currentState: DropperCurrentState = {
+      name: "demo",
+      filesetName: "main",
+      currentFile: "/src/a.ts",
+      pointer: { currentIndex: 0, total: 1 },
+    };
+
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "dropper", "current", "demo"],
+      {
+        dropperService: createDropperService({
+          current: async (): Promise<DropperCurrentState> => {
+            return currentState;
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe(`${JSON.stringify(currentState)}\n`);
   });
 
   test("write/move commands stay silent on stdout", async () => {

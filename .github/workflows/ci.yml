@@ -11,7 +11,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  cli-and-plugin-checks:
+  cli-checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
@@ -27,10 +27,6 @@ jobs:
       - name: Install CLI dependencies
         run: bun install
 
-      - name: Install plugin dependencies
-        working-directory: opencode-plugin
-        run: bun install
-
       - name: Run CLI check
         run: bun run check
 
@@ -40,23 +36,7 @@ jobs:
       - name: Run CLI tests
         run: bun run test
 
-      - name: Run plugin check
-        working-directory: opencode-plugin
-        run: bun run check
-
-      - name: Run plugin typecheck
-        working-directory: opencode-plugin
-        run: bun run typecheck
-
-      - name: Run plugin tests
-        working-directory: opencode-plugin
-        run: bun run test
-
       - name: Build CLI package
-        run: bun run build
-
-      - name: Build plugin package
-        working-directory: opencode-plugin
         run: bun run build
 
       - name: Build CLI release binaries

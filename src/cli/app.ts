@@ -7,13 +7,19 @@ import { DefaultFilesetService, type FilesetService } from "../fileset/service";
 import { getPackageVersion } from "../version/version";
 import { createDropperCommand } from "./commands/dropper";
 import { createFilesetCommand } from "./commands/fileset";
+import { createOpenCodeCommand } from "./commands/opencode";
 import { formatCliError, mapErrorToExitCode } from "./error-mapper";
 import { UsageError } from "./errors";
+import {
+  DefaultOpenCodeScaffoldService,
+  type OpenCodeScaffoldService,
+} from "./opencode/service";
 
 export type CliDependencies = {
   cwd?: string;
   filesetService?: FilesetService;
   dropperService?: DropperService;
+  openCodeScaffoldService?: OpenCodeScaffoldService;
   readAndValidateFilesetEntriesFn?: typeof readAndValidateFilesetEntries;
   stdout?: NodeJS.WritableStream;
   stderr?: NodeJS.WritableStream;
@@ -28,6 +34,8 @@ export async function runCli(
   const cwd = deps.cwd ?? process.cwd();
   const filesetService = deps.filesetService ?? new DefaultFilesetService();
   const dropperService = deps.dropperService ?? new DefaultDropperService();
+  const openCodeScaffoldService =
+    deps.openCodeScaffoldService ?? new DefaultOpenCodeScaffoldService();
   const stdout = deps.stdout ?? process.stdout;
   const stderr = deps.stderr ?? process.stderr;
 
@@ -51,6 +59,13 @@ export async function runCli(
         }),
       )
       .command(createDropperCommand({ cwd, dropperService, stdout }))
+      .command(
+        createOpenCodeCommand({
+          cwd,
+          openCodeScaffoldService,
+          stdout,
+        }),
+      )
       .completion("completion", "Generate shell completion script")
       .demandCommand(1, "You need at least one command before moving on")
       .strictCommands()

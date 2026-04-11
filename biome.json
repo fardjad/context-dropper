@@ -6,7 +6,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": [".", "!opencode-plugin", "!dist", "!node_modules"]
+    "includes": [".", "!dist", "!node_modules"]
   },
   "formatter": {
     "indentStyle": "space",

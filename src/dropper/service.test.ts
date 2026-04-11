@@ -149,6 +149,27 @@ describe("dropper/service", () => {
     expect(content).toBe("alpha");
   });
 
+  test("current returns compact pointer state and current file path", async () => {
+    const dataDir = "/data";
+    const { deps } = createMemoryDropperDeps({
+      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
+      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
+        fileset: "demo",
+        pointer_position: 1,
+        tags: {},
+      }),
+    });
+    const service = new DefaultDropperService(deps);
+
+    const current = await service.current({ dataDir, dropperName: "d1" });
+    expect(current).toEqual({
+      name: "d1",
+      filesetName: "demo",
+      currentFile: "/src/b.ts",
+      pointer: { currentIndex: 1, total: 2 },
+    });
+  });
+
   test("next and previous move pointer with boundary errors", async () => {
     const dataDir = "/data";
     const dropperPath = path.join(dataDir, "droppers", "d1.json");

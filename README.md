@@ -208,6 +208,14 @@ Show current file contents:
 context-dropper dropper show <dropperName>
 ```
 
+Show compact current state:
+
+```bash
+context-dropper dropper current <dropperName>
+```
+
+- Output: compact JSON with current file path and pointer state.
+
 Move pointer forward:
 
 ```bash
@@ -290,14 +298,42 @@ context-dropper dropper is-done <dropperName>
 - If done: prints `true` and exits `0`.
 - If not done: exits non-zero with an error listing untagged files.
 
-## OpenCode Plugin
+## OpenCode Scaffolding
 
-This repository also includes a dedicated, self-contained plugin for
-[OpenCode](https://github.com/opencode-ai/opencode) under `opencode-plugin/`.
-The plugin natively binds to the `context-dropper` APIs and lets you iterate
-through filesets autonomously inside an OpenCode chat session. See
-[opencode-plugin/README.md](./opencode-plugin/README.md) for installation and
-usage instructions.
+`context-dropper` can scaffold a project-local OpenCode setup that uses
+markdown slash commands plus controller/worker agents:
+
+```bash
+context-dropper opencode init
+```
+
+Optional model overrides:
+
+```bash
+context-dropper opencode init \
+  --controller-model openai/gpt-5 \
+  --worker-model openai/gpt-5-mini
+```
+
+This writes:
+
+- `opencode.jsonc` (or merges into an existing `opencode.json` /
+  `opencode.jsonc`)
+- `.opencode/commands/context-dropper.md`
+- `.opencode/commands/context-dropper-status.md`
+- `.opencode/commands/context-dropper-reset.md`
+- `.opencode/prompts/context-dropper-controller.md`
+- `.opencode/prompts/context-dropper-worker.md`
+
+After scaffolding, use OpenCode with:
+
+```text
+/context-dropper <fileset> "<task>"
+```
+
+The generated setup uses a controller agent that only drives the
+`context-dropper` CLI and delegates one-file-at-a-time work to a worker
+subagent.
 
 ## Exit Codes
 

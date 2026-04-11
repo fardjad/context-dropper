@@ -11,7 +11,9 @@ import path from "node:path";
 import { AppError } from "../file-utils/errors";
 import { DropperAtStartError, DropperExhaustedError } from "./errors";
 import type {
+  CurrentDropperInput,
   CreateDropperInput,
+  DropperCurrentState,
   DropperEntry,
   DropperRecord,
   DumpDropperInput,
@@ -31,6 +33,7 @@ import type {
 export interface DropperService {
   create(input: CreateDropperInput): Promise<void>;
   show(input: ShowDropperInput): Promise<string>;
+  current(input: CurrentDropperInput): Promise<DropperCurrentState>;
   next(input: NextDropperInput): Promise<void>;
   previous(input: PreviousDropperInput): Promise<void>;
   tag(input: TagDropperInput): Promise<void>;
@@ -335,6 +338,33 @@ export class DefaultDropperService implements DropperService {
     );
     const currentFile = this.getCurrentFile(persisted, filesetFiles);
     return this.deps.readSourceFileFn(currentFile);
+  }
+
+  async current(input: CurrentDropperInput): Promise<DropperCurrentState> {
+    const { persisted } = await this.loadDropper(
+      input.dataDir,
+      input.dropperName,
+    );
+    const filesetFiles = await this.loadFilesetFiles(
+      input.dataDir,
+      persisted.fileset,
+    );
+    const currentIndex =
+      persisted.pointer_position >= 0 &&
+      persisted.pointer_position < filesetFiles.length
+        ? persisted.pointer_position
+        : null;
+
+    return {
+      name: input.dropperName,
+      filesetName: persisted.fileset,
+      currentFile:
+        currentIndex === null ? null : filesetFiles[currentIndex] ?? null,
+      pointer: {
+        currentIndex,
+        total: filesetFiles.length,
+      },
+    };
   }
 
   async next(input: NextDropperInput): Promise<void> {
