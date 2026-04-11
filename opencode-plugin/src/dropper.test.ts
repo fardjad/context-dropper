@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { Dropper } from "./dropper";
 import { DefaultDropperService } from "../../src/dropper/service";
+import { Dropper } from "./dropper";
 
 // simple mock object
 class MockDropperService extends DefaultDropperService {

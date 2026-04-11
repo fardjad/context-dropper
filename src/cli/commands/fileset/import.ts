@@ -1,11 +1,11 @@
 import type { CommandModule } from "yargs";
-import { readAndValidateFilesetEntries } from "../../../fileset/import-list";
-import { createCliContext } from "../../context";
 import {
   asNonEmptyString,
   normalizeAbsolutePath,
   validatePortableName,
 } from "../../../file-utils/validation";
+import { readAndValidateFilesetEntries } from "../../../fileset/import-list";
+import { createCliContext } from "../../context";
 import type { FilesetCommandDeps } from "../fileset";
 
 export function createFilesetImportCommand(

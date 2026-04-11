@@ -6,7 +6,7 @@ on:
     - cron: "0 0 * * *"
 
 jobs:
-  update-root:
+  update-cli:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
@@ -23,22 +23,23 @@ jobs:
         uses: actions/cache@main
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-root-${{ hashFiles('bun.lock', 'bun.lockb') }}
+          key: ${{ runner.os }}-bun-cli-${{ hashFiles('bun.lock', 'bun.lockb') }}
           restore-keys: |
-            ${{ runner.os }}-bun-root-
+            ${{ runner.os }}-bun-cli-
             ${{ runner.os }}-bun-
-      - name: Install global tools
-        run: bun add -g rust-just dprint
       - uses: fardjad/my-actions/automatic-bun-update@main
         with:
-          source-branch: automatic-bun-update-root
+          source-branch: automatic-bun-update-cli
           github-token: ${{ steps.app-token.outputs.token }}
           verify-script: |
-            just test-cli
-            just build-cli
+            bun install
+            bun run check
+            bun run typecheck
+            bun run test
+            bun run build
           post-update-commands: |
             bun pm version patch --no-git-tag-version
-            dprint fmt
+            bun run fix
 
   update-opencode-plugin:
     runs-on: ubuntu-latest
@@ -61,18 +62,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-opencode-plugin-
             ${{ runner.os }}-bun-
-      - name: Install global tools
-        run: bun add -g rust-just dprint
       - uses: fardjad/my-actions/automatic-bun-update@main
         with:
           source-branch: automatic-bun-update-opencode-plugin
           github-token: ${{ steps.app-token.outputs.token }}
           working-directory: opencode-plugin
           verify-script: |
-            cd ..
-            just test-plugin
-            just build-plugin
+            bun install
+            bun run check
+            bun run typecheck
+            bun run test
+            bun run build
           post-update-commands: |
             bun pm version patch --no-git-tag-version
-            cd ..
-            dprint fmt
+            bun run fix

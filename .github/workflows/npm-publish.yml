@@ -37,14 +37,6 @@ jobs:
           node-version: "lts/*"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install global tools
-        run: bun add -g rust-just dprint
-
-      - name: Install dependencies
-        run: |
-          bun install
-          cd opencode-plugin && bun install
-
       - name: Publish
         env:
           INPUT_PACKAGE: ${{ inputs.package }}
@@ -63,7 +55,16 @@ jobs:
           fi
 
           case "$PACKAGE" in
-            context-dropper) just publish-cli ;;
-            opencode-context-dropper-plugin) just publish-plugin ;;
+            context-dropper)
+              PACKAGE_DIR="."
+              ;;
+            opencode-context-dropper-plugin)
+              PACKAGE_DIR="opencode-plugin"
+              ;;
             *) echo "Unsupported package: $PACKAGE" >&2; exit 1 ;;
           esac
+
+          cd "$PACKAGE_DIR"
+          bun install
+          bun pm pack
+          npm publish *.tgz --provenance --access public

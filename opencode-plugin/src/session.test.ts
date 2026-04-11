@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { type DropperService } from "../../src/dropper/service";
+import type { DropperService } from "../../src/dropper/service";
 import { SessionManager } from "./session";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,9 +1,6 @@
 import path from "node:path";
-import {
-  DefaultDropperService,
-  type DropperService,
-} from "../../src/dropper/service";
-import { type Logger } from "./logger";
+import type { DropperService } from "../../src/dropper/service";
+import type { Logger } from "./logger";
 
 export class Dropper {
   private readonly dataDir: string;
@@ -30,7 +27,7 @@ export class Dropper {
         dropperName: this.dropperName,
       });
     } catch (e: any) {
-      if (e.message && e.message.includes("not found")) {
+      if (e.message?.includes("not found")) {
         // dropper doesn't exist yet — that's fine, proceed to create
       } else {
         throw e;
@@ -65,7 +62,7 @@ export class Dropper {
         dropperName: this.dropperName,
       });
       return true;
-    } catch (e) {
+    } catch (_e) {
       return false; // Error implies there are untagged files remaining
     }
   }

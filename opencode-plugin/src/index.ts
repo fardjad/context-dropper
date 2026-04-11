@@ -1,8 +1,8 @@
 import { type Hooks, type Plugin, tool } from "@opencode-ai/plugin";
-import { type Logger, createLogger } from "./logger";
+import { DefaultDropperService } from "../../src/dropper/service";
+import { createLogger, type Logger } from "./logger";
 import { MessageHandler } from "./message-handler";
 import { SessionManager } from "./session";
-import { DefaultDropperService } from "../../src/dropper/service";
 import { getPackageVersion } from "./version";
 
 class Program {
@@ -18,7 +18,7 @@ class Program {
       ":context-dropper <string:filesetName> <string:instructions>",
       async (
         { filesetName, instructions },
-        { sessionId, messageId, input },
+        { sessionId, messageId, input: _input },
       ) => {
         this.log(`Processing :context-dropper command`, { sessionId });
         const session = await this.sessionManager.createSession(
@@ -46,7 +46,7 @@ class Program {
   private getActiveSession(messages: any[]) {
     if (!messages || messages.length === 0) return;
     const firstMessage = messages[0];
-    if (!firstMessage || !firstMessage.info) return;
+    if (!firstMessage?.info) return;
 
     const sessionId = firstMessage.info.sessionID;
     if (!sessionId) return;
@@ -92,7 +92,7 @@ class Program {
         description:
           "Call this tool when you have finished processing the current file to save state, prune context, and fetch the next file.",
         args: {},
-        execute: async (args, context) => {
+        execute: async (_args, context) => {
           const sessionId = context.sessionID;
           const session = this.sessionManager.getSession(sessionId);
 

@@ -33,7 +33,7 @@ jobs:
           filter: blob:none
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@main
         with:
           bun-version: latest
 
@@ -94,9 +94,23 @@ jobs:
         id: build_binaries
         if: steps.check_version.outputs.version_changed == 'true' && steps.create_tag.outputs.tag_exists != 'true' && matrix.package.build_binaries
         run: |
-          bun add -g rust-just dprint
           bun install
-          ARTIFACTS=$(just build-release-binaries)
+          set -euo pipefail
+          mkdir -p ./dist
+          for target_map in \
+            "bun-linux-x64:dist/context-dropper-linux-x64" \
+            "bun-windows-x64:dist/context-dropper-windows-x64.exe" \
+            "bun-darwin-x64:dist/context-dropper-macos-x64" \
+            "bun-darwin-arm64:dist/context-dropper-macos-arm64" \
+            "bun-linux-arm64:dist/context-dropper-linux-arm64" \
+            "bun-windows-arm64:dist/context-dropper-windows-arm64.exe"
+          do
+            target="${target_map%%:*}"
+            outfile="${target_map##*:}"
+            echo "Building ${target} -> ${outfile}"
+            bun build ./src/index.ts --compile --target="${target}" --outfile="${outfile}"
+          done
+          ARTIFACTS="dist/context-dropper-linux-x64 dist/context-dropper-windows-x64.exe dist/context-dropper-macos-x64 dist/context-dropper-macos-arm64 dist/context-dropper-linux-arm64 dist/context-dropper-windows-arm64.exe"
           echo "artifacts=${ARTIFACTS}" >> "$GITHUB_OUTPUT"
 
       - name: Create release

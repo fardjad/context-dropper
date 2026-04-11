@@ -4,11 +4,11 @@ import { hideBin } from "yargs/helpers";
 import { DefaultDropperService, type DropperService } from "../dropper/service";
 import type { readAndValidateFilesetEntries } from "../fileset/import-list";
 import { DefaultFilesetService, type FilesetService } from "../fileset/service";
-import { formatCliError, mapErrorToExitCode } from "./error-mapper";
+import { getPackageVersion } from "../version/version";
 import { createDropperCommand } from "./commands/dropper";
 import { createFilesetCommand } from "./commands/fileset";
+import { formatCliError, mapErrorToExitCode } from "./error-mapper";
 import { UsageError } from "./errors";
-import { getPackageVersion } from "../version/version";
 
 export type CliDependencies = {
   cwd?: string;

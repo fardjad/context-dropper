@@ -1,9 +1,9 @@
 import type { CommandModule } from "yargs";
-import { createCliContext } from "../../context";
 import {
   asNonEmptyString,
   validatePortableName,
 } from "../../../file-utils/validation";
+import { createCliContext } from "../../context";
 import type { FilesetCommandDeps } from "../fileset";
 
 export function createFilesetShowCommand(

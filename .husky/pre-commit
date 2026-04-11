@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -e
+
+bun run check
+bun run typecheck
+
+cd opencode-plugin
+bun run check
+bun run typecheck

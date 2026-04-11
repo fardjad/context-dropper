@@ -1,11 +1,11 @@
 import {
+  access,
   mkdir,
   readdir,
+  readFile,
   rm,
   stat,
-  readFile,
   writeFile,
-  access,
 } from "node:fs/promises";
 import path from "node:path";
 import { AppError } from "../file-utils/errors";
@@ -17,15 +17,15 @@ import type {
   DumpDropperInput,
   IsDoneDropperInput,
   ListDropperInput,
-  ListFilesDropperInput,
   ListDropperTagsInput,
+  ListFilesDropperInput,
   NextDropperInput,
+  PersistedDropper,
   PreviousDropperInput,
   RemoveDropperInput,
   RemoveDropperTagsInput,
   ShowDropperInput,
   TagDropperInput,
-  PersistedDropper,
 } from "./types";
 
 export interface DropperService {
@@ -497,10 +497,7 @@ export class DefaultDropperService implements DropperService {
         if (persisted.fileset === input.filesetName) {
           matchedDroppers.push(name);
         }
-      } catch (error) {
-        // Ignore files that are broken
-        continue;
-      }
+      } catch (_error) {}
     }
 
     return matchedDroppers;

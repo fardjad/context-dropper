@@ -11,7 +11,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  test:
+  cli-and-plugin-checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
@@ -21,22 +21,58 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install global tools
-        run: bun add -g rust-just dprint
+      - name: Verify Bun version
+        run: bun --version
 
-      - name: Verify versions
+      - name: Install CLI dependencies
+        run: bun install
+
+      - name: Install plugin dependencies
+        working-directory: opencode-plugin
+        run: bun install
+
+      - name: Run CLI check
+        run: bun run check
+
+      - name: Run CLI typecheck
+        run: bun run typecheck
+
+      - name: Run CLI tests
+        run: bun run test
+
+      - name: Run plugin check
+        working-directory: opencode-plugin
+        run: bun run check
+
+      - name: Run plugin typecheck
+        working-directory: opencode-plugin
+        run: bun run typecheck
+
+      - name: Run plugin tests
+        working-directory: opencode-plugin
+        run: bun run test
+
+      - name: Build CLI package
+        run: bun run build
+
+      - name: Build plugin package
+        working-directory: opencode-plugin
+        run: bun run build
+
+      - name: Build CLI release binaries
         run: |
-          bun --version
-          just --version
-          dprint --version
-
-      - name: Install dependencies
-        run: |
-          bun install
-          cd opencode-plugin && bun install
-
-      - name: Run tests and checks
-        run: just test
-
-      - name: Verify builds
-        run: just build-all
+          set -euo pipefail
+          mkdir -p ./dist
+          for target_map in \
+            "bun-linux-x64:dist/context-dropper-linux-x64" \
+            "bun-windows-x64:dist/context-dropper-windows-x64.exe" \
+            "bun-darwin-x64:dist/context-dropper-macos-x64" \
+            "bun-darwin-arm64:dist/context-dropper-macos-arm64" \
+            "bun-linux-arm64:dist/context-dropper-linux-arm64" \
+            "bun-windows-arm64:dist/context-dropper-windows-arm64.exe"
+          do
+            target="${target_map%%:*}"
+            outfile="${target_map##*:}"
+            echo "Building ${target} -> ${outfile}"
+            bun build ./src/index.ts --compile --target="${target}" --outfile="${outfile}"
+          done

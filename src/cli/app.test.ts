@@ -1,6 +1,7 @@
+import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { Writable } from "node:stream";
-import { describe, expect, test } from "bun:test";
+import { DropperAtStartError, DropperExhaustedError } from "../dropper/errors";
 import type { DropperService } from "../dropper/service";
 import type {
   CreateDropperInput,
@@ -9,8 +10,8 @@ import type {
   DumpDropperInput,
   IsDoneDropperInput,
   ListDropperInput,
-  ListFilesDropperInput,
   ListDropperTagsInput,
+  ListFilesDropperInput,
   NextDropperInput,
   PreviousDropperInput,
   RemoveDropperInput,
@@ -18,7 +19,7 @@ import type {
   ShowDropperInput,
   TagDropperInput,
 } from "../dropper/types";
-import { DropperAtStartError, DropperExhaustedError } from "../dropper/errors";
+import { AppError } from "../file-utils/errors";
 import type { FilesetService } from "../fileset/service";
 import type {
   FilesetRecord,
@@ -27,8 +28,7 @@ import type {
   RemoveFilesetInput,
   ShowFilesetInput,
 } from "../fileset/types";
-import { AppError } from "../file-utils/errors";
-import { runCli, type CliDependencies } from "./app";
+import { type CliDependencies, runCli } from "./app";
 
 class MemoryWritable extends Writable {
   private readonly chunks: string[] = [];
@@ -179,7 +179,7 @@ describe("CLI command skeleton", () => {
   });
 
   test("strict dropper name validation is enforced", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+    const { exitCode, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
         "context-dropper",
@@ -200,7 +200,7 @@ describe("CLI command skeleton", () => {
   test("dropper list-files parses tags and normalized filename", async () => {
     let listInput: ListFilesDropperInput | undefined;
     const cwd = process.cwd();
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+    const { exitCode, stderr } = await runCliWithCapturedOutput(
       [
         "bun",
         "context-dropper",

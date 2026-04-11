@@ -7,8 +7,6 @@ and develop both the main `context-dropper` CLI and the `opencode-plugin`.
 
 - [Bun](https://bun.sh/) (required for package management, running tests, and
   compiling binaries)
-- [Just](https://github.com/casey/just) (command runner used for executing
-  development scripts)
 
 ## Getting Started
 
@@ -19,6 +17,9 @@ git clone https://github.com/fardjad/context-dropper.git
 cd context-dropper
 bun install
 ```
+
+This also installs the repository Git hooks via Husky. The pre-commit hook runs
+Biome and TypeScript checks for both the CLI package and the plugin package.
 
 ### Developing the CLI
 
@@ -31,7 +32,8 @@ bun run src/index.ts --help
 To build the standalone binaries for all supported platforms yourself, run:
 
 ```bash
-just build-all
+bun run build
+bun run build:standalone
 ```
 
 The compiled executables will be available in the `./dist/` directory.

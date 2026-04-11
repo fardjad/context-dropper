@@ -1,6 +1,6 @@
-import { type DropperService } from "../../src/dropper/service";
+import type { DropperService } from "../../src/dropper/service";
 import { Dropper } from "./dropper";
-import { type Logger } from "./logger";
+import type { Logger } from "./logger";
 
 export interface SessionOptions {
   instructions: string;
@@ -16,7 +16,7 @@ export class Session {
   constructor(
     public readonly options: SessionOptions,
     private readonly log: Logger,
-    private readonly dropperService: DropperService,
+    dropperService: DropperService,
   ) {
     this.dropper = new Dropper(
       options.cwd,
