@@ -100,6 +100,43 @@ context-dropper --help
 To develop, compile binaries from source, or contribute to the project, please
 refer to the [Contributing Guide](CONTRIBUTING.md).
 
+## Shell Completion
+
+`context-dropper` can generate shell completion scripts with:
+
+```bash
+context-dropper completion
+```
+
+The output depends on the current shell, so set `SHELL` explicitly when
+installing it into your shell startup file.
+
+For `zsh`:
+
+```bash
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+SHELL=/bin/zsh context-dropper completion >> ~/.zshrc
+```
+
+For `bash`:
+
+```bash
+SHELL=/bin/bash context-dropper completion >> ~/.bashrc
+```
+
+To enable completion only for the current shell session instead of editing your
+startup file:
+
+```bash
+eval "$(SHELL=/bin/bash context-dropper completion)"
+```
+
+or:
+
+```bash
+eval "$(SHELL=/bin/zsh context-dropper completion)"
+```
+
 ## Command Shape
 
 ```bash
