@@ -1,14 +1,34 @@
 # Agent Instructions
 
-Before starting work, dynamically discover and read every Markdown rule file in
-`.agent/rules/`.
+Always follow these repository rules.
 
-Use this command to get the full set of rules:
+## Architecture
 
-```bash
-find .agent/rules -type f -name "*.md" | sort
-```
+- Read [docs/architecture.md](docs/architecture.md)
+  before making structural changes.
+- Keep CLI-only concerns in `src/cli`.
+- Do not import `src/cli` from non-CLI modules.
+- Keep module behavior, types, errors, and tests in the module that owns them.
+- Keep exit codes and error-to-exit mapping in `src/cli` only.
 
-Read and follow every file returned by that command.
+## Toolchain
 
-These rules are always-on for this repository and must be treated as required.
+- Use Bun for package management, scripts, and tests.
+- Prefer `bun install`, `bun add`, `bun remove`, `bun run`, and `bun test`.
+- Keep distribution code compatible with standard Node.js.
+- Do not use Bun-only runtime APIs in shipped source files.
+- Use standard Node.js built-ins for filesystem, path, and network behavior in
+  distribution code.
+
+## External Docs
+
+- Use Context7 automatically for external library and tool documentation,
+  setup, and API reference checks.
+
+## Versioning
+
+- This repository publishes `context-dropper`.
+- Follow semantic versioning.
+- When bumping the package version, use
+  `bun pm version <increment> --no-git-tag-version`.
+- Release tags must use the `v<version>` format.

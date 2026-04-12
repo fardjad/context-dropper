@@ -292,20 +292,10 @@ Generate scaffolding for a supported output target:
 context-dropper init <target>
 ```
 
-Current target:
+Supported targets:
 
 - `codex`
 - `opencode`
-
-Example:
-
-```bash
-context-dropper init codex
-```
-
-```bash
-context-dropper init opencode
-```
 
 Optional model overrides:
 
@@ -330,33 +320,17 @@ context-dropper init codex \
   --worker-reasoning-effort medium
 ```
 
-The `init` command is target-oriented so future outputs such as `codex` can be
-added without changing the top-level CLI shape.
+## Coding Harnesses
 
-## Codex Scaffolding
+### Codex
 
-`context-dropper init codex` writes:
+Initialize Codex support:
 
-- `.codex/agents/context-dropper-worker.toml`
-- `.agents/skills/context-dropper-create/SKILL.md`
-- `.agents/skills/context-dropper-loop/SKILL.md`
-- `.agents/skills/context-dropper-status/SKILL.md`
-- `.agents/skills/context-dropper-reset/SKILL.md`
+```bash
+context-dropper init codex
+```
 
-The generated Codex setup follows the Codex docs structure:
-
-- project-scoped custom agents live under `.codex/agents/`
-- repo-scoped skills live under `.agents/skills/`
-- skills act as the reusable entrypoints for create, loop, status, and reset workflows
-- the current Codex chat acts as the controller
-- the worker agent owns one-file-at-a-time execution
-- the controller loop is strictly sequential: wait for each worker to finish before advancing and fetching the next prompt
-- each file must run in a brand-new worker agent to avoid context rot; never reuse a worker across iterations
-- the controller should explicitly close each worker after it finishes
-- `--worker-model` sets `model` in the generated worker agent TOML
-- `--worker-reasoning-effort` sets `model_reasoning_effort` in the generated worker agent TOML
-
-Suggested Codex workflow:
+Use Codex with the generated skills:
 
 1. Import a fileset:
    `context-dropper fileset import --name <filesetName> <listFilePath>`
@@ -366,32 +340,15 @@ Suggested Codex workflow:
 4. In Codex, invoke `$context-dropper-create`.
 5. In Codex, invoke `$context-dropper-loop`.
 
-The generated Codex workflow derives dropper names as `codex-<filesetName>`.
+### OpenCode
 
-## OpenCode Scaffolding
+Initialize OpenCode support:
 
-`context-dropper init opencode` writes:
+```bash
+context-dropper init opencode
+```
 
-- `opencode.jsonc` or merges into an existing `opencode.json` / `opencode.jsonc`
-- `.opencode/commands/context-dropper-loop.md`
-- `.opencode/commands/context-dropper-create.md`
-- `.opencode/commands/context-dropper-status.md`
-- `.opencode/commands/context-dropper-reset.md`
-- `.opencode/prompts/context-dropper-worker.md`
-
-The generated OpenCode setup uses the current chat as the controller:
-
-- the current OpenCode chat manages droppers and loop state
-- the worker receives a thin generated per-file prompt plus its stable worker role prompt
-- on `STATUS: SUCCESS`, the controller advances the dropper
-- on `STATUS: FAILURE`, the controller stops
-- the controller loop is strictly sequential: wait for each worker to finish before advancing and fetching the next prompt
-- each file must run in a brand-new worker subagent to avoid context rot; never reuse a worker across iterations
-- the controller should explicitly close each worker subagent after it finishes
-- `--worker-model` sets `model` in the generated OpenCode worker agent config
-- `--worker-reasoning-effort` sets `reasoningEffort` in the generated OpenCode worker agent config
-
-## Suggested Agent Workflow
+Use OpenCode with the generated commands:
 
 1. Import a fileset:
    `context-dropper fileset import --name <filesetName> <listFilePath>`
@@ -402,14 +359,6 @@ The generated OpenCode setup uses the current chat as the controller:
    `/context-dropper-create <filesetName> <taskName>`
 5. Then run it:
    `/context-dropper-loop opencode-<filesetName>`
-
-The generated OpenCode commands are intentionally narrow:
-
-- `/context-dropper-create <fileset> <taskName>` creates `opencode-<fileset>`
-- `/context-dropper-loop <dropperName>` runs an existing dropper until it is done
-- `/context-dropper-status <dropperName>` inspects an existing dropper
-- `/context-dropper-reset <dropperName>` rewinds an existing dropper to the start
-- `<taskName>` is the name of an existing stored task, not raw task text
 
 ## Exit Codes
 
