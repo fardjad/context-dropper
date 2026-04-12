@@ -44,7 +44,7 @@ export function asNonEmptyString(value: unknown, label: string): string {
 
 export function validatePortableName(
   name: string,
-  kind: "fileset" | "dropper",
+  kind: "fileset" | "dropper" | "task",
 ): void {
   if (name === "." || name === "..") {
     throw new AppError(`Invalid ${kind} name: ${name}`);
@@ -90,22 +90,4 @@ export async function assertReadableFile(
   } catch {
     throw new AppError(`${label} is not readable: ${filePath}`);
   }
-}
-
-export function normalizeTagList(values: unknown, label: string): string[] {
-  const source = Array.isArray(values) ? values : [values];
-  const seen = new Set<string>();
-  const tags: string[] = [];
-
-  for (const value of source) {
-    const tag = asNonEmptyString(value, label);
-    if (seen.has(tag)) {
-      continue;
-    }
-
-    seen.add(tag);
-    tags.push(tag);
-  }
-
-  return tags;
 }

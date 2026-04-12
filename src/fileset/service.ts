@@ -8,6 +8,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { ensureDataDirGitignore } from "../file-utils/data-dir";
 import { AppError } from "../file-utils/errors";
 import type {
   FilesetRecord,
@@ -102,11 +103,37 @@ function getFilesetFilePath(dataDir: string, filesetName: string): string {
   return path.join(getFilesetsDirectory(dataDir), `${filesetName}.txt`);
 }
 
+function getFilesetBaseDirectory(dataDir: string): string {
+  return path.dirname(dataDir);
+}
+
 function parseFilesetContent(content: string): string[] {
   return content
     .split(/\r?\n/g)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+}
+
+function toPortableRelativePath(pathLike: string): string {
+  return pathLike.split(path.sep).join("/");
+}
+
+function toStoredFilesetPath(dataDir: string, absoluteFilePath: string): string {
+  const baseDir = getFilesetBaseDirectory(dataDir);
+  const relativePath = path.relative(baseDir, absoluteFilePath);
+
+  if (
+    relativePath.length === 0 ||
+    relativePath === ".." ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new AppError(
+      `Fileset entry is outside the fileset base directory: ${absoluteFilePath}`,
+    );
+  }
+
+  return toPortableRelativePath(relativePath);
 }
 
 function parseDropperReference(
@@ -140,6 +167,8 @@ export class DefaultFilesetService implements FilesetService {
   ) {}
 
   async importFromList(input: ImportFilesetInput): Promise<void> {
+    await ensureDataDirGitignore(input.dataDir, this.deps);
+
     const filesetsDirectory = getFilesetsDirectory(input.dataDir);
     const filesetFilePath = getFilesetFilePath(input.dataDir, input.name);
 
@@ -148,10 +177,11 @@ export class DefaultFilesetService implements FilesetService {
       throw new AppError(`Fileset already exists: ${input.name}`);
     }
 
+    const storedPaths = input.normalizedFilePaths.map((filePath) =>
+      toStoredFilesetPath(input.dataDir, filePath),
+    );
     const content =
-      input.normalizedFilePaths.length === 0
-        ? ""
-        : `${input.normalizedFilePaths.join("\n")}\n`;
+      storedPaths.length === 0 ? "" : `${storedPaths.join("\n")}\n`;
     await this.deps.writeTextFileFn(filesetFilePath, content);
   }
 

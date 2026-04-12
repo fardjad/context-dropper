@@ -1,17 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
+import { getDataDirGitignoreContent } from "../file-utils/data-dir";
 import { AppError } from "../file-utils/errors";
 import { DropperAtStartError, DropperExhaustedError } from "./errors";
-import {
-  DefaultDropperService,
-  type DropperServiceDeps,
-  type DropperStat,
-} from "./service";
+import { DefaultDropperService, type DropperServiceDeps } from "./service";
 
 type MemoryFile = {
   content: string;
-  createdAt: string;
-  updatedAt: string;
 };
 
 function createNotFoundError(filePath: string): NodeJS.ErrnoException {
@@ -25,22 +20,11 @@ function createMemoryDropperDeps(initialFiles: Record<string, string> = {}): {
   files: Map<string, MemoryFile>;
   ensuredDirs: Set<string>;
 } {
-  let tick = 0;
   const files = new Map<string, MemoryFile>();
   const ensuredDirs = new Set<string>();
 
-  const nowIso = (): string => {
-    tick += 1;
-    return new Date(1_700_000_000_000 + tick * 1000).toISOString();
-  };
-
   for (const [filePath, content] of Object.entries(initialFiles)) {
-    const timestamp = nowIso();
-    files.set(filePath, {
-      content,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    });
+    files.set(filePath, { content });
   }
 
   const deps: DropperServiceDeps = {
@@ -62,37 +46,12 @@ function createMemoryDropperDeps(initialFiles: Record<string, string> = {}): {
       filePath: string,
       content: string,
     ): Promise<void> => {
-      const existing = files.get(filePath);
-      const timestamp = nowIso();
-      files.set(filePath, {
-        content,
-        createdAt: existing?.createdAt ?? timestamp,
-        updatedAt: timestamp,
-      });
+      files.set(filePath, { content });
     },
     deleteFileFn: async (filePath: string): Promise<void> => {
       if (!files.delete(filePath)) {
         throw createNotFoundError(filePath);
       }
-    },
-    statFileFn: async (filePath: string): Promise<DropperStat> => {
-      const file = files.get(filePath);
-      if (file === undefined) {
-        throw createNotFoundError(filePath);
-      }
-
-      return {
-        createdAt: file.createdAt,
-        updatedAt: file.updatedAt,
-      };
-    },
-    readSourceFileFn: async (filePath: string): Promise<string> => {
-      const file = files.get(filePath);
-      if (file === undefined) {
-        throw createNotFoundError(filePath);
-      }
-
-      return file.content;
     },
     readDirFn: async (directoryPath: string): Promise<string[]> => {
       const results: string[] = [];
@@ -109,340 +68,252 @@ function createMemoryDropperDeps(initialFiles: Record<string, string> = {}): {
 }
 
 describe("dropper/service", () => {
-  test("create initializes persisted dropper JSON", async () => {
+  test("create stores fileset, task, and pointer", async () => {
     const dataDir = "/data";
-    const filesetPath = path.join(dataDir, "filesets", "demo.txt");
     const { deps, files, ensuredDirs } = createMemoryDropperDeps({
-      [filesetPath]: "/src/a.ts\n/src/b.ts\n",
+      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
+      [path.join(dataDir, "tasks", "review.md")]: "Review this file.\n",
     });
     const service = new DefaultDropperService(deps);
 
     await service.create({
       dataDir,
       filesetName: "demo",
+      taskName: "review",
       dropperName: "d1",
     });
 
     const dropperPath = path.join(dataDir, "droppers", "d1.json");
+    const gitignorePath = path.join(dataDir, ".gitignore");
+    expect(ensuredDirs.has(dataDir)).toBe(true);
     expect(ensuredDirs.has(path.join(dataDir, "droppers"))).toBe(true);
+    expect(files.get(gitignorePath)?.content).toBe(getDataDirGitignoreContent());
     expect(JSON.parse(files.get(dropperPath)?.content ?? "{}")).toEqual({
       fileset: "demo",
+      task: "review",
       pointer_position: 0,
-      tags: {},
     });
   });
 
-  test("show returns content of current file", async () => {
+  test("showTaskPrompt renders loop context, current file, task body, and protocol", async () => {
     const dataDir = "/data";
     const { deps } = createMemoryDropperDeps({
       [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
+      [path.join(dataDir, "tasks", "review.md")]:
+        "# Review\n\nLook for auth issues.\n",
       [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
         fileset: "demo",
-        pointer_position: 0,
-        tags: {},
-      }),
-      "/src/a.ts": "alpha",
-    });
-    const service = new DefaultDropperService(deps);
-
-    const content = await service.show({ dataDir, dropperName: "d1" });
-    expect(content).toBe("alpha");
-  });
-
-  test("current returns compact pointer state and current file path", async () => {
-    const dataDir = "/data";
-    const { deps } = createMemoryDropperDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
-      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
-        fileset: "demo",
+        task: "review",
         pointer_position: 1,
-        tags: {},
       }),
     });
     const service = new DefaultDropperService(deps);
 
-    const current = await service.current({ dataDir, dropperName: "d1" });
-    expect(current).toEqual({
-      name: "d1",
-      filesetName: "demo",
-      currentFile: "/src/b.ts",
-      pointer: { currentIndex: 1, total: 2 },
-    });
+    const prompt = await service.showTaskPrompt({ dataDir, dropperName: "d1" });
+    expect(prompt).toContain("Current file:\n/src/b.ts");
+    expect(prompt).toContain("User request:\n# Review\n\nLook for auth issues.");
+    expect(prompt).toContain("Reply with exactly one line:");
+    expect(prompt).toContain("STATUS: SUCCESS");
+    expect(prompt).toContain("or\nSTATUS: FAILURE");
   });
 
-  test("next and previous move pointer with boundary errors", async () => {
+  test("next advances into done state and then errors when already done", async () => {
     const dataDir = "/data";
     const dropperPath = path.join(dataDir, "droppers", "d1.json");
     const { deps, files } = createMemoryDropperDeps({
       [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
+      [path.join(dataDir, "tasks", "review.md")]: "Review this file.\n",
       [dropperPath]: JSON.stringify({
         fileset: "demo",
-        pointer_position: 0,
-        tags: {},
+        task: "review",
+        pointer_position: 1,
       }),
     });
     const service = new DefaultDropperService(deps);
 
     await service.next({ dataDir, dropperName: "d1" });
     expect(JSON.parse(files.get(dropperPath)?.content ?? "{}")).toMatchObject({
-      pointer_position: 1,
+      pointer_position: 2,
     });
 
     await expect(service.next({ dataDir, dropperName: "d1" })).rejects.toThrow(
       DropperExhaustedError,
     );
+  });
+
+  test("previous moves back from done to last file and errors at start", async () => {
+    const dataDir = "/data";
+    const dropperPath = path.join(dataDir, "droppers", "d1.json");
+    const { deps, files } = createMemoryDropperDeps({
+      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
+      [path.join(dataDir, "tasks", "review.md")]: "Review this file.\n",
+      [dropperPath]: JSON.stringify({
+        fileset: "demo",
+        task: "review",
+        pointer_position: 2,
+      }),
+    });
+    const service = new DefaultDropperService(deps);
 
     await service.previous({ dataDir, dropperName: "d1" });
     expect(JSON.parse(files.get(dropperPath)?.content ?? "{}")).toMatchObject({
-      pointer_position: 0,
+      pointer_position: 1,
     });
 
+    await service.previous({ dataDir, dropperName: "d1" });
     await expect(
       service.previous({ dataDir, dropperName: "d1" }),
     ).rejects.toThrow(DropperAtStartError);
   });
 
-  test("tag dedupes and sorts filenames within each tag", async () => {
-    const dataDir = "/data";
-    const dropperPath = path.join(dataDir, "droppers", "d1.json");
-    const { deps, files } = createMemoryDropperDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
-      [dropperPath]: JSON.stringify({
-        fileset: "demo",
-        pointer_position: 0,
-        tags: {
-          z: ["/src/a.ts"],
-          a: ["/src/b.ts", "/src/a.ts", "/src/a.ts"],
-        },
-      }),
-    });
-    const service = new DefaultDropperService(deps);
-
-    await service.tag({
-      dataDir,
-      dropperName: "d1",
-      tags: ["z", "b", "a"],
-    });
-
-    const persisted = JSON.parse(files.get(dropperPath)?.content ?? "{}");
-    expect(persisted.tags).toEqual({
-      a: ["/src/a.ts", "/src/b.ts"],
-      b: ["/src/a.ts"],
-      z: ["/src/a.ts"],
-    });
-  });
-
-  test("listTags returns sorted tags for current item", async () => {
+  test("isDone returns false before completion and true after completion", async () => {
     const dataDir = "/data";
     const { deps } = createMemoryDropperDeps({
       [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
+      [path.join(dataDir, "tasks", "review.md")]: "Review this file.\n",
       [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
         fileset: "demo",
-        pointer_position: 0,
-        tags: {
-          b: ["/src/a.ts"],
-          a: ["/src/a.ts"],
-          c: ["/src/b.ts"],
-        },
-      }),
-    });
-    const service = new DefaultDropperService(deps);
-
-    const tags = await service.listTags({ dataDir, dropperName: "d1" });
-    expect(tags).toEqual(["a", "b"]);
-  });
-
-  test("removeTags deletes current file membership and keeps unrelated tags", async () => {
-    const dataDir = "/data";
-    const dropperPath = path.join(dataDir, "droppers", "d1.json");
-    const { deps, files } = createMemoryDropperDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
-      [dropperPath]: JSON.stringify({
-        fileset: "demo",
-        pointer_position: 0,
-        tags: {
-          a: ["/src/a.ts"],
-          b: ["/src/b.ts"],
-        },
-      }),
-    });
-    const service = new DefaultDropperService(deps);
-
-    await service.removeTags({
-      dataDir,
-      dropperName: "d1",
-      tags: ["missing", "b", "a"],
-    });
-
-    const persisted = JSON.parse(files.get(dropperPath)?.content ?? "{}");
-    expect(persisted.tags).toEqual({
-      b: ["/src/b.ts"],
-    });
-  });
-
-  test("listFiles applies no filter, tag OR filter, filename filter, and AND combination", async () => {
-    const dataDir = "/data";
-    const { deps } = createMemoryDropperDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]:
-        "/src/a.ts\n/src/b.ts\n/src/c.ts\n",
-      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
-        fileset: "demo",
-        pointer_position: 0,
-        tags: {
-          x: ["/src/a.ts", "/src/b.ts"],
-          y: ["/src/c.ts"],
-        },
-      }),
-    });
-    const service = new DefaultDropperService(deps);
-
-    const all = await service.listFiles({ dataDir, dropperName: "d1" });
-    expect(all.map((entry) => entry.path)).toEqual([
-      "/src/a.ts",
-      "/src/b.ts",
-      "/src/c.ts",
-    ]);
-
-    const byTags = await service.listFiles({
-      dataDir,
-      dropperName: "d1",
-      tags: ["x", "y"],
-    });
-    expect(byTags.map((entry) => entry.path)).toEqual([
-      "/src/a.ts",
-      "/src/b.ts",
-      "/src/c.ts",
-    ]);
-
-    const byFilename = await service.listFiles({
-      dataDir,
-      dropperName: "d1",
-      filename: "/src/b.ts",
-    });
-    expect(byFilename.map((entry) => entry.path)).toEqual(["/src/b.ts"]);
-
-    const andCombined = await service.listFiles({
-      dataDir,
-      dropperName: "d1",
-      filename: "/src/b.ts",
-      tags: ["y"],
-    });
-    expect(andCombined).toEqual([]);
-  });
-
-  test("list retrieves all droppers in the data dir, honoring the fileset filter", async () => {
-    const dataDir = "/data";
-    const { deps } = createMemoryDropperDeps({
-      // Provide valid dropper files
-      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
-        fileset: "f1",
-        pointer_position: 0,
-        tags: {},
+        task: "review",
+        pointer_position: 1,
       }),
       [path.join(dataDir, "droppers", "d2.json")]: JSON.stringify({
-        fileset: "f2",
-        pointer_position: 0,
-        tags: {},
-      }),
-      // Ignore invalid ones
-      [path.join(dataDir, "droppers", "broken.json")]: "invalid json",
-    });
-
-    // Simulate fs.readdir to be available instead of relying on the system
-    deps.readDirFn = async () => [
-      "d1.json",
-      "d2.json",
-      "broken.json",
-      "text.txt",
-    ];
-
-    const service = new DefaultDropperService(deps);
-
-    const unfiltered = await service.list({ dataDir });
-    expect(unfiltered).toEqual(["broken", "d1", "d2"]);
-
-    const filtered1 = await service.list({ dataDir, filesetName: "f1" });
-    expect(filtered1).toEqual(["d1"]);
-
-    const filtered2 = await service.list({ dataDir, filesetName: "f2" });
-    expect(filtered2).toEqual(["d2"]);
-
-    const filtered3 = await service.list({
-      dataDir,
-      filesetName: "non-existent",
-    });
-    expect(filtered3).toEqual([]);
-  });
-
-  test("dump materializes dropper record and remove deletes persisted file", async () => {
-    const dataDir = "/data";
-    const dropperPath = path.join(dataDir, "droppers", "d1.json");
-    const { deps, files } = createMemoryDropperDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
-      [dropperPath]: JSON.stringify({
         fileset: "demo",
-        pointer_position: 1,
-        tags: {
-          t: ["/src/b.ts"],
-        },
-      }),
-    });
-    const service = new DefaultDropperService(deps);
-
-    const dumped = await service.dump({ dataDir, dropperName: "d1" });
-    expect(dumped.name).toBe("d1");
-    expect(dumped.filesetName).toBe("demo");
-    expect(dumped.pointer).toEqual({ currentIndex: 1, total: 2 });
-    expect(dumped.entries).toEqual([
-      { path: "/src/a.ts", tags: [] },
-      { path: "/src/b.ts", tags: ["t"] },
-    ]);
-
-    await service.remove({ dataDir, dropperName: "d1" });
-    expect(files.has(dropperPath)).toBe(false);
-
-    await expect(
-      service.remove({ dataDir, dropperName: "d1" }),
-    ).rejects.toThrow(AppError);
-  });
-
-  test("isDone returns true when all files have at least one tag", async () => {
-    const dataDir = "/data";
-    const { deps } = createMemoryDropperDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n/src/b.ts\n",
-      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
-        fileset: "demo",
-        pointer_position: 0,
-        tags: {
-          t1: ["/src/a.ts"],
-          t2: ["/src/b.ts"],
-        },
-      }),
-    });
-    const service = new DefaultDropperService(deps);
-
-    await expect(service.isDone({ dataDir, dropperName: "d1" })).resolves.toBe(
-      true,
-    );
-  });
-
-  test("isDone throws with list of untagged files when incomplete", async () => {
-    const dataDir = "/data";
-    const { deps } = createMemoryDropperDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]:
-        "/src/a.ts\n/src/b.ts\n/src/c.ts\n",
-      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
-        fileset: "demo",
-        pointer_position: 0,
-        tags: {
-          t1: ["/src/a.ts"],
-        },
+        task: "review",
+        pointer_position: 2,
       }),
     });
     const service = new DefaultDropperService(deps);
 
     await expect(
       service.isDone({ dataDir, dropperName: "d1" }),
-    ).rejects.toThrowError("Untagged items remain:\n/src/b.ts\n/src/c.ts");
+    ).resolves.toBe(false);
+    await expect(
+      service.isDone({ dataDir, dropperName: "d2" }),
+    ).resolves.toBe(true);
+  });
+
+  test("empty filesets are immediately done and have no pending files", async () => {
+    const dataDir = "/data";
+    const { deps } = createMemoryDropperDeps({
+      [path.join(dataDir, "filesets", "demo.txt")]: "",
+      [path.join(dataDir, "tasks", "review.md")]: "Review this file.\n",
+      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
+        fileset: "demo",
+        task: "review",
+        pointer_position: 0,
+      }),
+    });
+    const service = new DefaultDropperService(deps);
+
+    await expect(
+      service.isDone({ dataDir, dropperName: "d1" }),
+    ).resolves.toBe(true);
+    await expect(
+      service.listFiles({ dataDir, dropperName: "d1", status: "pending" }),
+    ).resolves.toEqual([]);
+  });
+
+  test("listFiles partitions files by done and pending status", async () => {
+    const dataDir = "/data";
+    const { deps } = createMemoryDropperDeps({
+      [path.join(dataDir, "filesets", "demo.txt")]:
+        "/src/a.ts\n/src/b.ts\n/src/c.ts\n",
+      [path.join(dataDir, "tasks", "review.md")]: "Review this file.\n",
+      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
+        fileset: "demo",
+        task: "review",
+        pointer_position: 1,
+      }),
+    });
+    const service = new DefaultDropperService(deps);
+
+    await expect(
+      service.listFiles({ dataDir, dropperName: "d1", status: "all" }),
+    ).resolves.toEqual(["/src/a.ts", "/src/b.ts", "/src/c.ts"]);
+    await expect(
+      service.listFiles({ dataDir, dropperName: "d1", status: "done" }),
+    ).resolves.toEqual(["/src/a.ts"]);
+    await expect(
+      service.listFiles({ dataDir, dropperName: "d1", status: "pending" }),
+    ).resolves.toEqual(["/src/b.ts", "/src/c.ts"]);
+  });
+
+  test("list retrieves droppers and honors fileset filter", async () => {
+    const dataDir = "/data";
+    const { deps } = createMemoryDropperDeps({
+      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
+        fileset: "f1",
+        task: "t1",
+        pointer_position: 0,
+      }),
+      [path.join(dataDir, "droppers", "d2.json")]: JSON.stringify({
+        fileset: "f2",
+        task: "t2",
+        pointer_position: 0,
+      }),
+      [path.join(dataDir, "droppers", "broken.json")]: "invalid json",
+    });
+    deps.readDirFn = async () => ["d1.json", "d2.json", "broken.json", "note.txt"];
+    const service = new DefaultDropperService(deps);
+
+    await expect(service.list({ dataDir })).resolves.toEqual([
+      "broken",
+      "d1",
+      "d2",
+    ]);
+    await expect(service.list({ dataDir, filesetName: "f1" })).resolves.toEqual([
+      "d1",
+    ]);
+  });
+
+  test("remove deletes the persisted dropper", async () => {
+    const dataDir = "/data";
+    const dropperPath = path.join(dataDir, "droppers", "d1.json");
+    const { deps, files } = createMemoryDropperDeps({
+      [dropperPath]: JSON.stringify({
+        fileset: "demo",
+        task: "review",
+        pointer_position: 0,
+      }),
+    });
+    const service = new DefaultDropperService(deps);
+
+    await service.remove({ dataDir, dropperName: "d1" });
+    expect(files.has(dropperPath)).toBe(false);
+  });
+
+  test("showTaskPrompt fails when the dropper is already done", async () => {
+    const dataDir = "/data";
+    const { deps } = createMemoryDropperDeps({
+      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n",
+      [path.join(dataDir, "tasks", "review.md")]: "Review this file.\n",
+      [path.join(dataDir, "droppers", "d1.json")]: JSON.stringify({
+        fileset: "demo",
+        task: "review",
+        pointer_position: 1,
+      }),
+    });
+    const service = new DefaultDropperService(deps);
+
+    await expect(
+      service.showTaskPrompt({ dataDir, dropperName: "d1" }),
+    ).rejects.toThrow(DropperExhaustedError);
+  });
+
+  test("create rejects missing tasks", async () => {
+    const dataDir = "/data";
+    const { deps } = createMemoryDropperDeps({
+      [path.join(dataDir, "filesets", "demo.txt")]: "/src/a.ts\n",
+    });
+    const service = new DefaultDropperService(deps);
+
+    await expect(
+      service.create({
+        dataDir,
+        filesetName: "demo",
+        taskName: "missing",
+        dropperName: "d1",
+      }),
+    ).rejects.toThrow(new AppError("Task not found: missing"));
   });
 });

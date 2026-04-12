@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
+import { getDataDirGitignoreContent } from "../file-utils/data-dir";
 import { AppError } from "../file-utils/errors";
 import {
   DefaultFilesetService,
@@ -102,57 +103,78 @@ function createMemoryFilesetDeps(initialFiles: Record<string, string> = {}): {
 }
 
 describe("fileset/service", () => {
-  test("import writes normalized content and rejects duplicate imports", async () => {
+  test("import stores paths relative to the fileset base directory and rejects duplicates", async () => {
     const { deps, files, ensuredDirs } = createMemoryFilesetDeps();
     const service = new DefaultFilesetService(deps);
-    const dataDir = "/data";
+    const dataDir = "/repo/.context-dropper";
 
     await service.importFromList({
       dataDir,
       name: "demo",
       listFilePath: "/ignored/list.txt",
-      normalizedFilePaths: ["/src/a.ts", "/src/b.ts"],
+      normalizedFilePaths: ["/repo/src/a.ts", "/repo/src/b.ts"],
     });
 
     const filesetPath = path.join(dataDir, "filesets", "demo.txt");
+    const gitignorePath = path.join(dataDir, ".gitignore");
+    expect(ensuredDirs.has(dataDir)).toBe(true);
     expect(ensuredDirs.has(path.join(dataDir, "filesets"))).toBe(true);
-    expect(files.get(filesetPath)?.content).toBe("/src/a.ts\n/src/b.ts\n");
+    expect(files.get(gitignorePath)?.content).toBe(getDataDirGitignoreContent());
+    expect(files.get(filesetPath)?.content).toBe("src/a.ts\nsrc/b.ts\n");
 
     await expect(
       service.importFromList({
         dataDir,
         name: "demo",
         listFilePath: "/ignored/list.txt",
-        normalizedFilePaths: ["/src/c.ts"],
+        normalizedFilePaths: ["/repo/src/c.ts"],
       }),
     ).rejects.toThrow(AppError);
+  });
+
+  test("import rejects entries outside the fileset base directory", async () => {
+    const { deps } = createMemoryFilesetDeps();
+    const service = new DefaultFilesetService(deps);
+
+    await expect(
+      service.importFromList({
+        dataDir: "/repo/.context-dropper",
+        name: "demo",
+        listFilePath: "/ignored/list.txt",
+        normalizedFilePaths: ["/elsewhere/a.ts"],
+      }),
+    ).rejects.toThrow(
+      new AppError(
+        "Fileset entry is outside the fileset base directory: /elsewhere/a.ts",
+      ),
+    );
   });
 
   test("list returns sorted filesets with parsed files", async () => {
     const dataDir = "/data";
     const { deps } = createMemoryFilesetDeps({
-      [path.join(dataDir, "filesets", "b.txt")]: "/b/one.ts\n",
-      [path.join(dataDir, "filesets", "a.txt")]: "/a/one.ts\n/a/two.ts\n",
+      [path.join(dataDir, "filesets", "b.txt")]: "b/one.ts\n",
+      [path.join(dataDir, "filesets", "a.txt")]: "a/one.ts\na/two.ts\n",
     });
     const service = new DefaultFilesetService(deps);
 
     const result = await service.list({ dataDir });
     expect(result.map((record) => record.name)).toEqual(["a", "b"]);
-    expect(result[0]?.files).toEqual(["/a/one.ts", "/a/two.ts"]);
-    expect(result[1]?.files).toEqual(["/b/one.ts"]);
+    expect(result[0]?.files).toEqual(["a/one.ts", "a/two.ts"]);
+    expect(result[1]?.files).toEqual(["b/one.ts"]);
   });
 
   test("show parses files and includes timestamps", async () => {
     const dataDir = "/data";
     const filesetPath = path.join(dataDir, "filesets", "demo.txt");
     const { deps } = createMemoryFilesetDeps({
-      [filesetPath]: " /x.ts \n\n/y.ts\n",
+      [filesetPath]: " src/x.ts \n\nsrc/y.ts\n",
     });
     const service = new DefaultFilesetService(deps);
 
     const result = await service.show({ dataDir, name: "demo" });
     expect(result.name).toBe("demo");
-    expect(result.files).toEqual(["/x.ts", "/y.ts"]);
+    expect(result.files).toEqual(["src/x.ts", "src/y.ts"]);
     expect(result.createdAt.length).toBeGreaterThan(0);
     expect(result.updatedAt.length).toBeGreaterThan(0);
   });
@@ -160,16 +182,16 @@ describe("fileset/service", () => {
   test("remove blocks when referenced by droppers", async () => {
     const dataDir = "/data";
     const { deps } = createMemoryFilesetDeps({
-      [path.join(dataDir, "filesets", "demo.txt")]: "/x.ts\n",
+      [path.join(dataDir, "filesets", "demo.txt")]: "src/x.ts\n",
       [path.join(dataDir, "droppers", "alpha.json")]: JSON.stringify({
         fileset: "demo",
+        task: "review",
         pointer_position: 0,
-        tags: {},
       }),
       [path.join(dataDir, "droppers", "beta.json")]: JSON.stringify({
         fileset: "other",
+        task: "review",
         pointer_position: 0,
-        tags: {},
       }),
     });
     const service = new DefaultFilesetService(deps);
@@ -185,11 +207,11 @@ describe("fileset/service", () => {
     const dataDir = "/data";
     const filesetPath = path.join(dataDir, "filesets", "demo.txt");
     const { deps, files } = createMemoryFilesetDeps({
-      [filesetPath]: "/x.ts\n",
+      [filesetPath]: "src/x.ts\n",
       [path.join(dataDir, "droppers", "beta.json")]: JSON.stringify({
         fileset: "other",
+        task: "review",
         pointer_position: 0,
-        tags: {},
       }),
     });
     const service = new DefaultFilesetService(deps);

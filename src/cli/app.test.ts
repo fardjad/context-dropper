@@ -4,22 +4,14 @@ import { Writable } from "node:stream";
 import { DropperAtStartError, DropperExhaustedError } from "../dropper/errors";
 import type { DropperService } from "../dropper/service";
 import type {
-  CurrentDropperInput,
   CreateDropperInput,
-  DropperCurrentState,
-  DropperEntry,
-  DropperRecord,
-  DumpDropperInput,
   IsDoneDropperInput,
   ListDropperInput,
-  ListDropperTagsInput,
   ListFilesDropperInput,
   NextDropperInput,
   PreviousDropperInput,
   RemoveDropperInput,
-  RemoveDropperTagsInput,
-  ShowDropperInput,
-  TagDropperInput,
+  ShowTaskPromptInput,
 } from "../dropper/types";
 import { AppError } from "../file-utils/errors";
 import type { FilesetService } from "../fileset/service";
@@ -30,11 +22,16 @@ import type {
   RemoveFilesetInput,
   ShowFilesetInput,
 } from "../fileset/types";
+import type { InitService, InitTargetInput, InitTargetResult } from "./init/service";
+import type { TaskService } from "../task/service";
 import type {
-  InitOpenCodeScaffoldInput,
-  InitOpenCodeScaffoldResult,
-  OpenCodeScaffoldService,
-} from "./opencode/service";
+  CreateTaskInput,
+  ListTasksInput,
+  RemoveTaskInput,
+  ShowTaskInput,
+  TaskRecord,
+  UpdateTaskInput,
+} from "../task/types";
 import { type CliDependencies, runCli } from "./app";
 
 class MemoryWritable extends Writable {
@@ -93,55 +90,46 @@ function createFilesetService(
   };
 }
 
+function createTaskService(overrides: Partial<TaskService> = {}): TaskService {
+  return {
+    create: async (_input: CreateTaskInput) => {},
+    update: async (_input: UpdateTaskInput) => {},
+    show: async (_input: ShowTaskInput): Promise<TaskRecord> => {
+      return {
+        name: "task",
+        content: "",
+        createdAt: "",
+        updatedAt: "",
+      };
+    },
+    list: async (_input: ListTasksInput): Promise<TaskRecord[]> => [],
+    remove: async (_input: RemoveTaskInput) => {},
+    ...overrides,
+  };
+}
+
 function createDropperService(
   overrides: Partial<DropperService> = {},
 ): DropperService {
   return {
     create: async (_input: CreateDropperInput) => {},
-    show: async (_input: ShowDropperInput): Promise<string> => "",
-    current: async (
-      _input: CurrentDropperInput,
-    ): Promise<DropperCurrentState> => {
-      return {
-        name: "dropper",
-        filesetName: "fileset",
-        currentFile: null,
-        pointer: { currentIndex: null, total: 0 },
-      };
-    },
+    showTaskPrompt: async (_input: ShowTaskPromptInput): Promise<string> => "",
     next: async (_input: NextDropperInput) => {},
     previous: async (_input: PreviousDropperInput) => {},
-    tag: async (_input: TagDropperInput) => {},
-    listTags: async (_input: ListDropperTagsInput): Promise<string[]> => [],
-    removeTags: async (_input: RemoveDropperTagsInput) => {},
     list: async (_input: ListDropperInput): Promise<string[]> => [],
-    listFiles: async (
-      _input: ListFilesDropperInput,
-    ): Promise<DropperEntry[]> => [],
+    listFiles: async (_input: ListFilesDropperInput): Promise<string[]> => [],
     remove: async (_input: RemoveDropperInput) => {},
-    dump: async (_input: DumpDropperInput): Promise<DropperRecord> => {
-      return {
-        name: "dropper",
-        filesetName: "fileset",
-        entries: [],
-        pointer: { currentIndex: null, total: 0 },
-        createdAt: "",
-        updatedAt: "",
-      };
-    },
-    isDone: async (_input: IsDoneDropperInput): Promise<boolean> => true,
+    isDone: async (_input: IsDoneDropperInput): Promise<boolean> => false,
     ...overrides,
   };
 }
 
-function createOpenCodeScaffoldService(
-  overrides: Partial<OpenCodeScaffoldService> = {},
-): OpenCodeScaffoldService {
+function createInitService(overrides: Partial<InitService> = {}): InitService {
   return {
-    init: async (
-      _input: InitOpenCodeScaffoldInput,
-    ): Promise<InitOpenCodeScaffoldResult> => {
+    listTargets: (): ("codex" | "opencode")[] => ["codex", "opencode"],
+    init: async (_input: InitTargetInput): Promise<InitTargetResult> => {
       return {
+        target: "opencode",
         configPath: "/repo/opencode.jsonc",
         writtenFiles: ["/repo/opencode.jsonc"],
       };
@@ -160,20 +148,11 @@ describe("CLI command skeleton", () => {
     expect(stderr).toBe("");
   });
 
-  test("help exits successfully", async () => {
-    const { exitCode } = await runCliWithCapturedOutput([
-      "bun",
-      "context-dropper",
-      "--help",
-    ]);
-    expect(exitCode).toBe(0);
-  });
-
-  test("fileset without subcommand shows usage and exits successfully", async () => {
+  test("task without subcommand shows usage and exits successfully", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
       "context-dropper",
-      "fileset",
+      "task",
     ]);
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
@@ -189,27 +168,17 @@ describe("CLI command skeleton", () => {
     expect(stderr).toBe("");
   });
 
-  test("opencode without subcommand shows usage and exits successfully", async () => {
+  test("init without target returns usage exit code", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
       "context-dropper",
-      "opencode",
-    ]);
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-  });
-
-  test("extract command is not registered", async () => {
-    const { exitCode, stderr } = await runCliWithCapturedOutput([
-      "bun",
-      "context-dropper",
-      "extract",
+      "init",
     ]);
     expect(exitCode).toBe(2);
-    expect(stderr).toContain("Unknown command");
+    expect(stderr).toContain("Not enough non-option arguments");
   });
 
-  test("missing required args returns usage exit code 2", async () => {
+  test("missing required dropper args returns usage exit code 2", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput([
       "bun",
       "context-dropper",
@@ -218,29 +187,61 @@ describe("CLI command skeleton", () => {
       "demo",
     ]);
     expect(exitCode).toBe(2);
-    expect(stderr).toContain("Missing required argument: fileset");
+    expect(stderr).toContain("Missing required arguments: fileset, task");
   });
 
-  test("strict dropper name validation is enforced", async () => {
+  test("strict task name validation is enforced", async () => {
     const { exitCode, stderr } = await runCliWithCapturedOutput(
+      [
+        "bun",
+        "context-dropper",
+        "task",
+        "show",
+        "bad name",
+      ],
+      {
+        taskService: createTaskService(),
+      },
+    );
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Invalid task name: bad name");
+  });
+
+  test("dropper create passes fileset and task to the service", async () => {
+    let createInput: CreateDropperInput | undefined;
+    const cwd = process.cwd();
+    const { exitCode } = await runCliWithCapturedOutput(
       [
         "bun",
         "context-dropper",
         "dropper",
         "create",
-        "bad name",
+        "demo",
         "--fileset",
-        "ok-fileset",
+        "tracked",
+        "--task",
+        "review-auth",
       ],
       {
-        dropperService: createDropperService(),
+        cwd,
+        dropperService: createDropperService({
+          create: async (input: CreateDropperInput): Promise<void> => {
+            createInput = input;
+          },
+        }),
       },
     );
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("Invalid dropper name: bad name");
+
+    expect(exitCode).toBe(0);
+    expect(createInput).toEqual({
+      dataDir: path.resolve(cwd, ".context-dropper"),
+      filesetName: "tracked",
+      taskName: "review-auth",
+      dropperName: "demo",
+    });
   });
 
-  test("dropper list-files parses tags and normalized filename", async () => {
+  test("dropper list-files parses pending status", async () => {
     let listInput: ListFilesDropperInput | undefined;
     const cwd = process.cwd();
     const { exitCode, stderr } = await runCliWithCapturedOutput(
@@ -250,19 +251,12 @@ describe("CLI command skeleton", () => {
         "dropper",
         "list-files",
         "demo",
-        "--tag",
-        "alpha",
-        "--tag",
-        "beta",
-        "--filename",
-        "./README.md",
+        "--pending",
       ],
       {
         cwd,
         dropperService: createDropperService({
-          listFiles: async (
-            input: ListFilesDropperInput,
-          ): Promise<DropperEntry[]> => {
+          listFiles: async (input: ListFilesDropperInput): Promise<string[]> => {
             listInput = input;
             return [];
           },
@@ -272,11 +266,238 @@ describe("CLI command skeleton", () => {
 
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
-    expect(listInput).toBeDefined();
-    expect(listInput?.dropperName).toBe("demo");
-    expect(listInput?.tags).toEqual(["alpha", "beta"]);
-    expect(listInput?.filename).toBe(path.resolve(cwd, "README.md"));
-    expect(listInput?.dataDir).toBe(path.resolve(cwd, ".context-dropper"));
+    expect(listInput).toEqual({
+      dataDir: path.resolve(cwd, ".context-dropper"),
+      dropperName: "demo",
+      status: "pending",
+    });
+  });
+
+  test("dropper show-task-prompt prints generated prompt", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "dropper", "show-task-prompt", "demo"],
+      {
+        dropperService: createDropperService({
+          showTaskPrompt: async (): Promise<string> => {
+            return "STATUS: SUCCESS\n";
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("STATUS: SUCCESS\n");
+  });
+
+  test("dropper is-done prints boolean output", async () => {
+    const { exitCode, stdout } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "dropper", "is-done", "demo"],
+      {
+        dropperService: createDropperService({
+          isDone: async (): Promise<boolean> => true,
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("true\n");
+  });
+
+  test("task list prints one task name per line", async () => {
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "task", "list"],
+      {
+        taskService: createTaskService({
+          list: async (): Promise<TaskRecord[]> => {
+            return [
+              { name: "alpha", content: "", createdAt: "", updatedAt: "" },
+              { name: "beta", content: "", createdAt: "", updatedAt: "" },
+            ];
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toBe("alpha\nbeta\n");
+  });
+
+  test("task show prints raw markdown content", async () => {
+    const { exitCode, stdout } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "task", "show", "review-auth"],
+      {
+        taskService: createTaskService({
+          show: async (): Promise<TaskRecord> => {
+            return {
+              name: "review-auth",
+              content: "# Review\n\nDetails\n",
+              createdAt: "",
+              updatedAt: "",
+            };
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("# Review\n\nDetails\n");
+  });
+
+  test("init opencode passes worker model overrides to the init service", async () => {
+    let initInput: InitTargetInput | undefined;
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      [
+        "bun",
+        "context-dropper",
+        "init",
+        "opencode",
+        "--worker-model",
+        "openai/gpt-5-mini",
+      ],
+      {
+        cwd: "/repo",
+        initService: createInitService({
+          init: async (input: InitTargetInput): Promise<InitTargetResult> => {
+            initInput = input;
+            return {
+              target: "opencode",
+              configPath: "/repo/opencode.jsonc",
+              writtenFiles: ["/repo/opencode.jsonc"],
+            };
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(initInput).toEqual({
+      cwd: "/repo",
+      target: "opencode",
+      workerModel: "openai/gpt-5-mini",
+      workerReasoningEffort: undefined,
+    });
+    expect(stdout).toContain("Initialized opencode scaffold in /repo");
+  });
+
+  test("init opencode passes reasoning overrides to the init service", async () => {
+    let initInput: InitTargetInput | undefined;
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      [
+        "bun",
+        "context-dropper",
+        "init",
+        "opencode",
+        "--worker-reasoning-effort",
+        "medium",
+      ],
+      {
+        cwd: "/repo",
+        initService: createInitService({
+          init: async (input: InitTargetInput): Promise<InitTargetResult> => {
+            initInput = input;
+            return {
+              target: "opencode",
+              configPath: "/repo/opencode.jsonc",
+              writtenFiles: ["/repo/opencode.jsonc"],
+            };
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(initInput).toEqual({
+      cwd: "/repo",
+      target: "opencode",
+      workerModel: undefined,
+      workerReasoningEffort: "medium",
+    });
+    expect(stdout).toContain("Initialized opencode scaffold in /repo");
+  });
+
+  test("init codex passes worker model and reasoning overrides to the init service", async () => {
+    let initInput: InitTargetInput | undefined;
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      [
+        "bun",
+        "context-dropper",
+        "init",
+        "codex",
+        "--worker-model",
+        "gpt-5.4-mini",
+        "--worker-reasoning-effort",
+        "medium",
+      ],
+      {
+        cwd: "/repo",
+        initService: createInitService({
+          init: async (input: InitTargetInput): Promise<InitTargetResult> => {
+            initInput = input;
+            return {
+              target: "codex",
+              configPath: "/repo/.codex/agents/context-dropper-worker.toml",
+              writtenFiles: ["/repo/.codex/agents/context-dropper-worker.toml"],
+            };
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(initInput).toEqual({
+      cwd: "/repo",
+      target: "codex",
+      workerModel: "gpt-5.4-mini",
+      workerReasoningEffort: "medium",
+    });
+    expect(stdout).toContain("Initialized codex scaffold in /repo");
+  });
+
+  test("init help exposes supported targets", async () => {
+    const { exitCode, stdout } = await runCliWithCapturedOutput([
+      "bun",
+      "context-dropper",
+      "init",
+      "--help",
+    ]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("codex");
+    expect(stdout).toContain("opencode");
+  });
+
+  test("init codex passes the target to the init service", async () => {
+    let initInput: InitTargetInput | undefined;
+    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "init", "codex"],
+      {
+        cwd: "/repo",
+        initService: createInitService({
+          init: async (input: InitTargetInput): Promise<InitTargetResult> => {
+            initInput = input;
+            return {
+              target: "codex",
+              configPath: "/repo/.codex/agents/context-dropper-worker.toml",
+              writtenFiles: ["/repo/.codex/agents/context-dropper-worker.toml"],
+            };
+          },
+        }),
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(initInput).toEqual({
+      cwd: "/repo",
+      target: "codex",
+      workerModel: undefined,
+      workerReasoningEffort: undefined,
+    });
+    expect(stdout).toContain("Initialized codex scaffold in /repo");
   });
 
   test("fileset list prints one fileset name per line", async () => {
@@ -299,326 +520,59 @@ describe("CLI command skeleton", () => {
     expect(stdout).toBe("alpha\nbeta\n");
   });
 
-  test("fileset show prints one file path per line", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "fileset", "show", "demo"],
-      {
-        filesetService: createFilesetService({
-          show: async (): Promise<FilesetRecord> => {
-            return {
-              name: "demo",
-              files: ["/src/a.ts", "/src/b.ts"],
-              createdAt: "",
-              updatedAt: "",
-            };
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(stdout).toBe("/src/a.ts\n/src/b.ts\n");
-  });
-
-  test("opencode init passes model overrides to the scaffold service", async () => {
-    let initInput: InitOpenCodeScaffoldInput | undefined;
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      [
-        "bun",
-        "context-dropper",
-        "opencode",
-        "init",
-        "--controller-model",
-        "openai/gpt-5",
-        "--worker-model",
-        "openai/gpt-5-mini",
-      ],
-      {
-        cwd: "/repo",
-        openCodeScaffoldService: createOpenCodeScaffoldService({
-          init: async (
-            input: InitOpenCodeScaffoldInput,
-          ): Promise<InitOpenCodeScaffoldResult> => {
-            initInput = input;
-            return {
-              configPath: "/repo/opencode.jsonc",
-              writtenFiles: [
-                "/repo/opencode.jsonc",
-                "/repo/.opencode/commands/context-dropper.md",
-              ],
-            };
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(initInput).toEqual({
-      cwd: "/repo",
-      controllerModel: "openai/gpt-5",
-      workerModel: "openai/gpt-5-mini",
-    });
-    expect(stdout).toContain("Initialized OpenCode scaffold in /repo");
-    expect(stdout).toContain("/repo/opencode.jsonc");
-  });
-
-  test("opencode init reports scaffold service errors", async () => {
-    const { exitCode, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "opencode", "init"],
-      {
-        cwd: "/repo",
-        openCodeScaffoldService: createOpenCodeScaffoldService({
-          init: async (): Promise<InitOpenCodeScaffoldResult> => {
-            throw new AppError("Cannot initialize OpenCode scaffold");
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("Cannot initialize OpenCode scaffold");
-  });
-
-  test("fileset import resolves list entries relative to list file directory", async () => {
-    const listFile = "./test-fixtures/files.txt";
-    const normalizedListFilePath = path.resolve(process.cwd(), listFile);
-    const normalizedEntries = ["/abs/source/a.txt", "/abs/source/b.txt"];
-    let seamCalledWith: string | undefined;
-
-    let importInput: ImportFilesetInput | undefined;
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      [
-        "bun",
-        "context-dropper",
-        "fileset",
-        "import",
-        "--name",
-        "sample",
-        listFile,
-      ],
-      {
-        readAndValidateFilesetEntriesFn: async (
-          listFilePath: string,
-        ): Promise<string[]> => {
-          seamCalledWith = listFilePath;
-          return normalizedEntries;
-        },
-        filesetService: createFilesetService({
-          importFromList: async (input: ImportFilesetInput): Promise<void> => {
-            importInput = input;
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(seamCalledWith).toBe(normalizedListFilePath);
-    expect(importInput).toBeDefined();
-    expect(importInput?.listFilePath).toBe(normalizedListFilePath);
-    expect(importInput?.normalizedFilePaths).toEqual(normalizedEntries);
-    expect(stdout).toBe("");
-  });
-
-  test("dropper show maps exhausted state to exit code 3", async () => {
-    const { exitCode, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "show", "demo"],
+  test("dropper exhausted error maps to exit code 3", async () => {
+    const { exitCode } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "dropper", "next", "demo"],
       {
         dropperService: createDropperService({
-          show: async (_input: ShowDropperInput): Promise<string> => {
+          next: async (): Promise<void> => {
             throw new DropperExhaustedError();
           },
         }),
       },
     );
-
     expect(exitCode).toBe(3);
-    expect(stderr).toContain("No file left in dropper");
   });
 
-  test("dropper previous maps at-start state to exit code 4", async () => {
-    const { exitCode, stderr } = await runCliWithCapturedOutput(
+  test("dropper at start error maps to exit code 4", async () => {
+    const { exitCode } = await runCliWithCapturedOutput(
       ["bun", "context-dropper", "dropper", "previous", "demo"],
       {
         dropperService: createDropperService({
-          previous: async (_input: PreviousDropperInput): Promise<void> => {
+          previous: async (): Promise<void> => {
             throw new DropperAtStartError();
           },
         }),
       },
     );
-
     expect(exitCode).toBe(4);
-    expect(stderr).toContain("Dropper is already at the first item");
   });
 
-  test("dropper show prints content and appends trailing newline", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "show", "demo"],
+  test("removed dropper commands are rejected", async () => {
+    const { exitCode, stderr } = await runCliWithCapturedOutput([
+      "bun",
+      "context-dropper",
+      "dropper",
+      "tag",
+      "demo",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain("Unknown command");
+  });
+
+  test("application errors remain exit code 1", async () => {
+    const { exitCode, stderr } = await runCliWithCapturedOutput(
+      ["bun", "context-dropper", "dropper", "show-task-prompt", "demo"],
       {
         dropperService: createDropperService({
-          show: async (): Promise<string> => {
-            return "hello world";
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(stdout).toBe("hello world\n");
-  });
-
-  test("dropper list-files prints path only for each entry", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "list-files", "demo"],
-      {
-        dropperService: createDropperService({
-          listFiles: async (): Promise<DropperEntry[]> => {
-            return [
-              { path: "/src/a.ts", tags: ["x"] },
-              { path: "/src/b.ts", tags: [] },
-            ];
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(stdout).toBe("/src/a.ts\n/src/b.ts\n");
-  });
-
-  test("dropper list prints valid droppers with an optional fileset filter", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "list", "--fileset", "f1"],
-      {
-        dropperService: createDropperService({
-          list: async (): Promise<string[]> => {
-            return ["d1", "d2"];
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(stdout).toBe("d1\nd2\n");
-  });
-
-  test("dropper list-tags prints one tag per line", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "list-tags", "demo"],
-      {
-        dropperService: createDropperService({
-          listTags: async (): Promise<string[]> => {
-            return ["alpha", "beta"];
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(stdout).toBe("alpha\nbeta\n");
-  });
-
-  test("dropper dump prints pretty JSON", async () => {
-    const dumpRecord: DropperRecord = {
-      name: "demo",
-      filesetName: "main",
-      entries: [{ path: "/src/a.ts", tags: ["alpha"] }],
-      pointer: { currentIndex: 0, total: 1 },
-      createdAt: "2025-01-01T00:00:00.000Z",
-      updatedAt: "2025-01-01T00:00:00.000Z",
-    };
-
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "dump", "demo"],
-      {
-        dropperService: createDropperService({
-          dump: async (): Promise<DropperRecord> => {
-            return dumpRecord;
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(stdout).toBe(`${JSON.stringify(dumpRecord, null, 2)}\n`);
-  });
-
-  test("dropper current prints compact JSON", async () => {
-    const currentState: DropperCurrentState = {
-      name: "demo",
-      filesetName: "main",
-      currentFile: "/src/a.ts",
-      pointer: { currentIndex: 0, total: 1 },
-    };
-
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "current", "demo"],
-      {
-        dropperService: createDropperService({
-          current: async (): Promise<DropperCurrentState> => {
-            return currentState;
-          },
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
-    expect(stdout).toBe(`${JSON.stringify(currentState)}\n`);
-  });
-
-  test("write/move commands stay silent on stdout", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "next", "demo"],
-      {
-        dropperService: createDropperService(),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stdout).toBe("");
-    expect(stderr).toBe("");
-  });
-
-  test("dropper is-done prints true and exits 0 when complete", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "is-done", "demo"],
-      {
-        dropperService: createDropperService({
-          isDone: async (): Promise<boolean> => true,
-        }),
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stdout).toBe("true\n");
-    expect(stderr).toBe("");
-  });
-
-  test("dropper is-done exits non-zero and prints untagged files on stderr", async () => {
-    const { exitCode, stdout, stderr } = await runCliWithCapturedOutput(
-      ["bun", "context-dropper", "dropper", "is-done", "demo"],
-      {
-        dropperService: createDropperService({
-          isDone: async (): Promise<boolean> => {
-            throw new AppError("Untagged items remain:\n/src/a.ts\n/src/b.ts");
+          showTaskPrompt: async (): Promise<string> => {
+            throw new AppError("boom");
           },
         }),
       },
     );
 
     expect(exitCode).toBe(1);
-    expect(stdout).toBe("");
-    expect(stderr).toContain("Untagged items remain:");
-    expect(stderr).toContain("/src/a.ts");
-    expect(stderr).toContain("/src/b.ts");
+    expect(stderr).toContain("boom");
   });
 });

@@ -1,7 +1,7 @@
 {
   "name": "context-dropper",
-  "version": "0.3.3",
-  "description": "CLI for iterating through a fixed list of files, tracking position, and tagging progress within an AI agent's session.",
+  "version": "0.3.4",
+  "description": "CLI for running file-by-file agent loops over filesets, markdown tasks, and pointer-based droppers.",
   "author": {
     "name": "Fardjad Davari",
     "email": "public@fardjad.com"

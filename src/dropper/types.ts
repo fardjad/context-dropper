@@ -1,47 +1,31 @@
-export type DropperEntry = {
-  path: string;
-  tags: string[];
-};
-
 export type DropperPointerState = {
   currentIndex: number | null;
   total: number;
 };
 
-export type DropperCurrentState = {
-  name: string;
-  filesetName: string;
-  currentFile: string | null;
-  pointer: DropperPointerState;
-};
+export type DropperListFilesStatus = "all" | "done" | "pending";
 
 export type DropperRecord = {
   name: string;
   filesetName: string;
-  entries: DropperEntry[];
+  taskName: string;
   pointer: DropperPointerState;
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type PersistedDropper = {
   fileset: string;
+  task: string;
   pointer_position: number;
-  tags: Record<string, string[]>;
 };
 
 export type CreateDropperInput = {
   dataDir: string;
   filesetName: string;
+  taskName: string;
   dropperName: string;
 };
 
-export type ShowDropperInput = {
-  dataDir: string;
-  dropperName: string;
-};
-
-export type CurrentDropperInput = {
+export type ShowTaskPromptInput = {
   dataDir: string;
   dropperName: string;
 };
@@ -56,28 +40,10 @@ export type PreviousDropperInput = {
   dropperName: string;
 };
 
-export type TagDropperInput = {
-  dataDir: string;
-  dropperName: string;
-  tags: string[];
-};
-
-export type ListDropperTagsInput = {
-  dataDir: string;
-  dropperName: string;
-};
-
-export type RemoveDropperTagsInput = {
-  dataDir: string;
-  dropperName: string;
-  tags: string[];
-};
-
 export type ListFilesDropperInput = {
   dataDir: string;
   dropperName: string;
-  tags?: string[];
-  filename?: string;
+  status: DropperListFilesStatus;
 };
 
 export type ListDropperInput = {
@@ -86,11 +52,6 @@ export type ListDropperInput = {
 };
 
 export type RemoveDropperInput = {
-  dataDir: string;
-  dropperName: string;
-};
-
-export type DumpDropperInput = {
   dataDir: string;
   dropperName: string;
 };

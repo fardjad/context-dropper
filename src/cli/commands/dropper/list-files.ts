@@ -1,8 +1,7 @@
 import type { CommandModule } from "yargs";
+import { AppError } from "../../../file-utils/errors";
 import {
   asNonEmptyString,
-  normalizeAbsolutePath,
-  normalizeTagList,
   validatePortableName,
 } from "../../../file-utils/validation";
 import { createCliContext } from "../../context";
@@ -14,17 +13,23 @@ export function createDropperListFilesCommand(
   return {
     command: "list-files <dropperName>",
     aliases: ["ls-files"],
-    describe: "List files in a dropper with optional filters",
+    describe: "List files in a dropper filtered by done status",
     builder: (yargs) => {
       return yargs
-        .option("tag", {
-          type: "string",
-          array: true,
-          describe: "Filter by tag. Repeat --tag for OR semantics.",
+        .option("done", {
+          type: "boolean",
+          default: false,
+          describe: "List only files before the current pointer",
         })
-        .option("filename", {
-          type: "string",
-          describe: "Filter by an exact normalized absolute file path",
+        .option("pending", {
+          type: "boolean",
+          default: false,
+          describe: "List only the current file and files after it",
+        })
+        .option("all", {
+          type: "boolean",
+          default: false,
+          describe: "List all files regardless of pointer position",
         })
         .positional("dropperName", {
           type: "string",
@@ -37,27 +42,24 @@ export function createDropperListFilesCommand(
       const dropperName = asNonEmptyString(argv.dropperName, "<dropperName>");
       validatePortableName(dropperName, "dropper");
 
-      const tags =
-        argv.tag === undefined
-          ? undefined
-          : normalizeTagList(argv.tag, "--tag");
-      const filename =
-        argv.filename === undefined
-          ? undefined
-          : normalizeAbsolutePath(
-              asNonEmptyString(argv.filename, "--filename"),
-              deps.cwd,
-            );
+      const selectedStatuses = [argv.done, argv.pending, argv.all].filter(
+        (value) => value === true,
+      ).length;
+      if (selectedStatuses > 1) {
+        throw new AppError("Use only one of --done, --pending, or --all");
+      }
 
-      const entries = await deps.dropperService.listFiles({
+      const status =
+        argv.done === true ? "done" : argv.pending === true ? "pending" : "all";
+
+      const files = await deps.dropperService.listFiles({
         dataDir: context.dataDir,
         dropperName,
-        tags,
-        filename,
+        status,
       });
 
-      for (const entry of entries) {
-        deps.stdout.write(`${entry.path}\n`);
+      for (const filePath of files) {
+        deps.stdout.write(`${filePath}\n`);
       }
     },
   };

@@ -6,12 +6,12 @@ import {
 import { createCliContext } from "../../context";
 import type { DropperCommandDeps } from "../dropper";
 
-export function createDropperDumpCommand(
+export function createDropperShowTaskPromptCommand(
   deps: DropperCommandDeps,
 ): CommandModule {
   return {
-    command: "dump <dropperName>",
-    describe: "Dump the full dropper contents",
+    command: "show-task-prompt <dropperName>",
+    describe: "Generate the worker prompt for the active file in a dropper",
     builder: (yargs) => {
       return yargs.positional("dropperName", {
         type: "string",
@@ -24,12 +24,12 @@ export function createDropperDumpCommand(
       const dropperName = asNonEmptyString(argv.dropperName, "<dropperName>");
       validatePortableName(dropperName, "dropper");
 
-      const record = await deps.dropperService.dump({
+      const prompt = await deps.dropperService.showTaskPrompt({
         dataDir: context.dataDir,
         dropperName,
       });
 
-      deps.stdout.write(`${JSON.stringify(record, null, 2)}\n`);
+      deps.stdout.write(prompt);
     },
   };
 }

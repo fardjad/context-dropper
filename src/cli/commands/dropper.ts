@@ -1,18 +1,13 @@
 import type { CommandModule } from "yargs";
 import type { DropperService } from "../../dropper/service";
-import { createDropperCurrentCommand } from "./dropper/current";
 import { createDropperCreateCommand } from "./dropper/create";
-import { createDropperDumpCommand } from "./dropper/dump";
 import { createDropperIsDoneCommand } from "./dropper/is-done";
 import { createDropperListCommand } from "./dropper/list";
 import { createDropperListFilesCommand } from "./dropper/list-files";
-import { createDropperListTagsCommand } from "./dropper/list-tags";
 import { createDropperNextCommand } from "./dropper/next";
 import { createDropperPreviousCommand } from "./dropper/previous";
 import { createDropperRemoveCommand } from "./dropper/remove";
-import { createDropperRemoveTagCommand } from "./dropper/remove-tag";
-import { createDropperShowCommand } from "./dropper/show";
-import { createDropperTagCommand } from "./dropper/tag";
+import { createDropperShowTaskPromptCommand } from "./dropper/show-task-prompt";
 
 export type DropperCommandDeps = {
   cwd: string;
@@ -31,18 +26,13 @@ export function createDropperCommand(deps: DropperCommandDeps): CommandModule {
 
       return yargs
         .command(createDropperCreateCommand(deps))
-        .command(createDropperCurrentCommand(deps))
-        .command(createDropperShowCommand(deps))
+        .command(createDropperShowTaskPromptCommand(deps))
         .command(createDropperNextCommand(deps))
         .command(createDropperPreviousCommand(deps))
-        .command(createDropperTagCommand(deps))
-        .command(createDropperListTagsCommand(deps))
-        .command(createDropperRemoveTagCommand(deps))
+        .command(createDropperIsDoneCommand(deps))
         .command(createDropperListCommand(deps))
         .command(createDropperListFilesCommand(deps))
         .command(createDropperRemoveCommand(deps))
-        .command(createDropperDumpCommand(deps))
-        .command(createDropperIsDoneCommand(deps))
         .strictCommands();
     },
     handler: () => {

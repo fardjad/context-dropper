@@ -4,22 +4,22 @@ import { hideBin } from "yargs/helpers";
 import { DefaultDropperService, type DropperService } from "../dropper/service";
 import type { readAndValidateFilesetEntries } from "../fileset/import-list";
 import { DefaultFilesetService, type FilesetService } from "../fileset/service";
+import { DefaultTaskService, type TaskService } from "../task/service";
 import { getPackageVersion } from "../version/version";
 import { createDropperCommand } from "./commands/dropper";
 import { createFilesetCommand } from "./commands/fileset";
-import { createOpenCodeCommand } from "./commands/opencode";
+import { createInitCommand } from "./commands/init";
+import { createTaskCommand } from "./commands/task";
 import { formatCliError, mapErrorToExitCode } from "./error-mapper";
 import { UsageError } from "./errors";
-import {
-  DefaultOpenCodeScaffoldService,
-  type OpenCodeScaffoldService,
-} from "./opencode/service";
+import { DefaultInitService, type InitService } from "./init/service";
 
 export type CliDependencies = {
   cwd?: string;
   filesetService?: FilesetService;
   dropperService?: DropperService;
-  openCodeScaffoldService?: OpenCodeScaffoldService;
+  taskService?: TaskService;
+  initService?: InitService;
   readAndValidateFilesetEntriesFn?: typeof readAndValidateFilesetEntries;
   stdout?: NodeJS.WritableStream;
   stderr?: NodeJS.WritableStream;
@@ -34,8 +34,8 @@ export async function runCli(
   const cwd = deps.cwd ?? process.cwd();
   const filesetService = deps.filesetService ?? new DefaultFilesetService();
   const dropperService = deps.dropperService ?? new DefaultDropperService();
-  const openCodeScaffoldService =
-    deps.openCodeScaffoldService ?? new DefaultOpenCodeScaffoldService();
+  const taskService = deps.taskService ?? new DefaultTaskService();
+  const initService = deps.initService ?? new DefaultInitService();
   const stdout = deps.stdout ?? process.stdout;
   const stderr = deps.stderr ?? process.stderr;
 
@@ -58,14 +58,9 @@ export async function runCli(
           stdout,
         }),
       )
+      .command(createTaskCommand({ cwd, taskService, stdout }))
       .command(createDropperCommand({ cwd, dropperService, stdout }))
-      .command(
-        createOpenCodeCommand({
-          cwd,
-          openCodeScaffoldService,
-          stdout,
-        }),
-      )
+      .command(createInitCommand({ cwd, initService, stdout }))
       .completion("completion", "Generate shell completion script")
       .demandCommand(1, "You need at least one command before moving on")
       .strictCommands()

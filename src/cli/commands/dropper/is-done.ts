@@ -11,7 +11,7 @@ export function createDropperIsDoneCommand(
 ): CommandModule {
   return {
     command: "is-done <dropperName>",
-    describe: "Check whether all files in a dropper have at least one tag",
+    describe: "Check whether the dropper pointer has reached the end",
     builder: (yargs) => {
       return yargs.positional("dropperName", {
         type: "string",
@@ -28,10 +28,7 @@ export function createDropperIsDoneCommand(
         dataDir: context.dataDir,
         dropperName,
       });
-
-      if (done) {
-        deps.stdout.write("true\n");
-      }
+      deps.stdout.write(`${done}\n`);
     },
   };
 }

@@ -4,7 +4,6 @@ import { AppError } from "./errors";
 import {
   asNonEmptyString,
   normalizeAbsolutePath,
-  normalizeTagList,
   validatePortableName,
 } from "./validation";
 
@@ -24,13 +23,6 @@ describe("file-utils/validation", () => {
     expect(normalizeAbsolutePath("./a.txt", baseDir)).toBe(
       path.resolve(baseDir, "a.txt"),
     );
-  });
-
-  test("normalizeTagList trims and deduplicates tags", () => {
-    expect(normalizeTagList(["one", " one ", "two"], "--tag")).toEqual([
-      "one",
-      "two",
-    ]);
   });
 
   test("asNonEmptyString rejects empty input", () => {

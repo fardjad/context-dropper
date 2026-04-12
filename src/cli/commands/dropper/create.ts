@@ -20,6 +20,11 @@ export function createDropperCreateCommand(
           demandOption: true,
           describe: "Name of the fileset to initialize from",
         })
+        .option("task", {
+          type: "string",
+          demandOption: true,
+          describe: "Name of the task to attach to the dropper",
+        })
         .positional("dropperName", {
           type: "string",
           demandOption: true,
@@ -30,6 +35,8 @@ export function createDropperCreateCommand(
       const context = createCliContext(argv, deps.cwd);
       const filesetName = asNonEmptyString(argv.fileset, "--fileset");
       validatePortableName(filesetName, "fileset");
+      const taskName = asNonEmptyString(argv.task, "--task");
+      validatePortableName(taskName, "task");
 
       const dropperName = asNonEmptyString(argv.dropperName, "<dropperName>");
       validatePortableName(dropperName, "dropper");
@@ -37,6 +44,7 @@ export function createDropperCreateCommand(
       await deps.dropperService.create({
         dataDir: context.dataDir,
         filesetName,
+        taskName,
         dropperName,
       });
     },

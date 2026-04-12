@@ -4,52 +4,34 @@ import {
   readdir,
   readFile,
   rm,
-  stat,
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { ensureDataDirGitignore } from "../file-utils/data-dir";
 import { AppError } from "../file-utils/errors";
 import { DropperAtStartError, DropperExhaustedError } from "./errors";
 import type {
-  CurrentDropperInput,
   CreateDropperInput,
-  DropperCurrentState,
-  DropperEntry,
-  DropperRecord,
-  DumpDropperInput,
   IsDoneDropperInput,
   ListDropperInput,
-  ListDropperTagsInput,
   ListFilesDropperInput,
-  NextDropperInput,
   PersistedDropper,
   PreviousDropperInput,
   RemoveDropperInput,
-  RemoveDropperTagsInput,
-  ShowDropperInput,
-  TagDropperInput,
+  ShowTaskPromptInput,
+  NextDropperInput,
 } from "./types";
 
 export interface DropperService {
   create(input: CreateDropperInput): Promise<void>;
-  show(input: ShowDropperInput): Promise<string>;
-  current(input: CurrentDropperInput): Promise<DropperCurrentState>;
+  showTaskPrompt(input: ShowTaskPromptInput): Promise<string>;
   next(input: NextDropperInput): Promise<void>;
   previous(input: PreviousDropperInput): Promise<void>;
-  tag(input: TagDropperInput): Promise<void>;
-  listTags(input: ListDropperTagsInput): Promise<string[]>;
-  removeTags(input: RemoveDropperTagsInput): Promise<void>;
   list(input: ListDropperInput): Promise<string[]>;
-  listFiles(input: ListFilesDropperInput): Promise<DropperEntry[]>;
+  listFiles(input: ListFilesDropperInput): Promise<string[]>;
   remove(input: RemoveDropperInput): Promise<void>;
-  dump(input: DumpDropperInput): Promise<DropperRecord>;
   isDone(input: IsDoneDropperInput): Promise<boolean>;
 }
-
-export type DropperStat = {
-  createdAt: string;
-  updatedAt: string;
-};
 
 export type DropperServiceDeps = {
   ensureDirFn: (directoryPath: string) => Promise<void>;
@@ -57,8 +39,6 @@ export type DropperServiceDeps = {
   readTextFileFn: (filePath: string) => Promise<string>;
   writeTextFileFn: (filePath: string, content: string) => Promise<void>;
   deleteFileFn: (filePath: string) => Promise<void>;
-  statFileFn: (filePath: string) => Promise<DropperStat>;
-  readSourceFileFn: (filePath: string) => Promise<string>;
   readDirFn: (directoryPath: string) => Promise<string[]>;
 };
 
@@ -92,16 +72,6 @@ export const defaultDropperServiceDeps: DropperServiceDeps = {
   deleteFileFn: async (filePath: string): Promise<void> => {
     await rm(filePath);
   },
-  statFileFn: async (filePath: string): Promise<DropperStat> => {
-    const fileStat = await stat(filePath);
-    return {
-      createdAt: fileStat.ctime.toISOString(),
-      updatedAt: fileStat.mtime.toISOString(),
-    };
-  },
-  readSourceFileFn: async (filePath: string): Promise<string> => {
-    return await readFile(filePath, "utf-8");
-  },
   readDirFn: async (directoryPath: string): Promise<string[]> => {
     try {
       return await readdir(directoryPath);
@@ -109,6 +79,7 @@ export const defaultDropperServiceDeps: DropperServiceDeps = {
       if (isNotFoundError(error)) {
         return [];
       }
+
       throw error;
     }
   },
@@ -118,12 +89,20 @@ function getFilesetsDirectory(dataDir: string): string {
   return path.join(dataDir, "filesets");
 }
 
+function getTasksDirectory(dataDir: string): string {
+  return path.join(dataDir, "tasks");
+}
+
 function getDroppersDirectory(dataDir: string): string {
   return path.join(dataDir, "droppers");
 }
 
 function getFilesetFilePath(dataDir: string, filesetName: string): string {
   return path.join(getFilesetsDirectory(dataDir), `${filesetName}.txt`);
+}
+
+function getTaskFilePath(dataDir: string, taskName: string): string {
+  return path.join(getTasksDirectory(dataDir), `${taskName}.md`);
 }
 
 function getDropperFilePath(dataDir: string, dropperName: string): string {
@@ -135,20 +114,6 @@ function parseFilesetContent(content: string): string[] {
     .split(/\r?\n/g)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-}
-
-function normalizeTagMap(
-  tags: Record<string, string[]>,
-): Record<string, string[]> {
-  const normalized: Record<string, string[]> = {};
-
-  for (const [tag, files] of Object.entries(tags)) {
-    normalized[tag] = Array.from(new Set(files)).sort((a, b) =>
-      a.localeCompare(b),
-    );
-  }
-
-  return normalized;
 }
 
 function parsePersistedDropper(
@@ -168,10 +133,15 @@ function parsePersistedDropper(
 
   const candidate = parsed as {
     fileset?: unknown;
+    task?: unknown;
     pointer_position?: unknown;
-    tags?: unknown;
   };
+
   if (typeof candidate.fileset !== "string" || candidate.fileset.length === 0) {
+    throw new AppError(`Invalid dropper data: ${dropperName}`);
+  }
+
+  if (typeof candidate.task !== "string" || candidate.task.length === 0) {
     throw new AppError(`Invalid dropper data: ${dropperName}`);
   }
 
@@ -182,37 +152,35 @@ function parsePersistedDropper(
     throw new AppError(`Invalid dropper data: ${dropperName}`);
   }
 
-  if (
-    typeof candidate.tags !== "object" ||
-    candidate.tags === null ||
-    Array.isArray(candidate.tags)
-  ) {
-    throw new AppError(`Invalid dropper data: ${dropperName}`);
-  }
-
-  const tagsInput = candidate.tags as Record<string, unknown>;
-  const tags: Record<string, string[]> = {};
-
-  for (const [tag, files] of Object.entries(tagsInput)) {
-    if (
-      !Array.isArray(files) ||
-      files.some((value) => typeof value !== "string")
-    ) {
-      throw new AppError(`Invalid dropper data: ${dropperName}`);
-    }
-
-    tags[tag] = Array.from(new Set(files)).sort((a, b) => a.localeCompare(b));
-  }
-
   return {
     fileset: candidate.fileset,
+    task: candidate.task,
     pointer_position: candidate.pointer_position,
-    tags,
   };
 }
 
 function withTrailingNewline(value: string): string {
   return value.endsWith("\n") ? value : `${value}\n`;
+}
+
+function buildTaskPrompt(currentFile: string, taskBody: string): string {
+  const trimmedTaskBody = taskBody.trimEnd();
+
+  return withTrailingNewline(
+    [
+      "Current file:",
+      currentFile,
+      "",
+      "User request:",
+      trimmedTaskBody.length === 0 ? "(empty task)" : trimmedTaskBody,
+      "",
+      "Response protocol:",
+      "Reply with exactly one line:",
+      "STATUS: SUCCESS",
+      "or",
+      "STATUS: FAILURE",
+    ].join("\n"),
+  );
 }
 
 export class DefaultDropperService implements DropperService {
@@ -231,6 +199,18 @@ export class DefaultDropperService implements DropperService {
 
     const content = await this.deps.readTextFileFn(filesetPath);
     return parseFilesetContent(content);
+  }
+
+  private async loadTaskContent(
+    dataDir: string,
+    taskName: string,
+  ): Promise<string> {
+    const taskPath = getTaskFilePath(dataDir, taskName);
+    if (!(await this.deps.fileExistsFn(taskPath))) {
+      throw new AppError(`Task not found: ${taskName}`);
+    }
+
+    return await this.deps.readTextFileFn(taskPath);
   }
 
   private async loadDropper(
@@ -253,63 +233,36 @@ export class DefaultDropperService implements DropperService {
     dropperPath: string,
     persistedDropper: PersistedDropper,
   ): Promise<void> {
-    const normalized: PersistedDropper = {
-      ...persistedDropper,
-      tags: normalizeTagMap(persistedDropper.tags),
-    };
-    const content = withTrailingNewline(JSON.stringify(normalized, null, 2));
+    const content = withTrailingNewline(
+      JSON.stringify(persistedDropper, null, 2),
+    );
     await this.deps.writeTextFileFn(dropperPath, content);
   }
 
-  private getCurrentFile(
+  private ensurePointerWithinBounds(
+    dropperName: string,
     persistedDropper: PersistedDropper,
     filesetFiles: string[],
-  ): string {
-    const pointer = persistedDropper.pointer_position;
+  ): void {
     if (
-      filesetFiles.length === 0 ||
-      pointer < 0 ||
-      pointer >= filesetFiles.length
+      persistedDropper.pointer_position < 0 ||
+      persistedDropper.pointer_position > filesetFiles.length
     ) {
-      throw new DropperExhaustedError();
+      throw new AppError(`Invalid dropper data: ${dropperName}`);
     }
-
-    const currentFile = filesetFiles[pointer];
-    if (currentFile === undefined) {
-      throw new DropperExhaustedError();
-    }
-
-    return currentFile;
-  }
-
-  private buildEntries(
-    filesetFiles: string[],
-    tags: Record<string, string[]>,
-  ): DropperEntry[] {
-    const fileTags = new Map<string, Set<string>>();
-    for (const [tag, files] of Object.entries(tags)) {
-      for (const filePath of files) {
-        const currentTags = fileTags.get(filePath) ?? new Set<string>();
-        currentTags.add(tag);
-        fileTags.set(filePath, currentTags);
-      }
-    }
-
-    return filesetFiles.map((filePath) => {
-      const tagsForFile = Array.from(fileTags.get(filePath) ?? []).sort(
-        (a, b) => a.localeCompare(b),
-      );
-      return {
-        path: filePath,
-        tags: tagsForFile,
-      };
-    });
   }
 
   async create(input: CreateDropperInput): Promise<void> {
+    await ensureDataDirGitignore(input.dataDir, this.deps);
+
     const filesetPath = getFilesetFilePath(input.dataDir, input.filesetName);
     if (!(await this.deps.fileExistsFn(filesetPath))) {
       throw new AppError(`Fileset not found: ${input.filesetName}`);
+    }
+
+    const taskPath = getTaskFilePath(input.dataDir, input.taskName);
+    if (!(await this.deps.fileExistsFn(taskPath))) {
+      throw new AppError(`Task not found: ${input.taskName}`);
     }
 
     const droppersDirectory = getDroppersDirectory(input.dataDir);
@@ -322,49 +275,30 @@ export class DefaultDropperService implements DropperService {
 
     await this.saveDropper(dropperPath, {
       fileset: input.filesetName,
+      task: input.taskName,
       pointer_position: 0,
-      tags: {},
     });
   }
 
-  async show(input: ShowDropperInput): Promise<string> {
-    const { persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
+  async showTaskPrompt(input: ShowTaskPromptInput): Promise<string> {
+    const { persisted } = await this.loadDropper(input.dataDir, input.dropperName);
     const filesetFiles = await this.loadFilesetFiles(
       input.dataDir,
       persisted.fileset,
     );
-    const currentFile = this.getCurrentFile(persisted, filesetFiles);
-    return this.deps.readSourceFileFn(currentFile);
-  }
 
-  async current(input: CurrentDropperInput): Promise<DropperCurrentState> {
-    const { persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
-    const filesetFiles = await this.loadFilesetFiles(
-      input.dataDir,
-      persisted.fileset,
-    );
-    const currentIndex =
-      persisted.pointer_position >= 0 &&
-      persisted.pointer_position < filesetFiles.length
-        ? persisted.pointer_position
-        : null;
+    this.ensurePointerWithinBounds(input.dropperName, persisted, filesetFiles);
+    if (persisted.pointer_position >= filesetFiles.length) {
+      throw new DropperExhaustedError();
+    }
 
-    return {
-      name: input.dropperName,
-      filesetName: persisted.fileset,
-      currentFile:
-        currentIndex === null ? null : filesetFiles[currentIndex] ?? null,
-      pointer: {
-        currentIndex,
-        total: filesetFiles.length,
-      },
-    };
+    const currentFile = filesetFiles[persisted.pointer_position];
+    if (currentFile === undefined) {
+      throw new DropperExhaustedError();
+    }
+
+    const taskBody = await this.loadTaskContent(input.dataDir, persisted.task);
+    return buildTaskPrompt(currentFile, taskBody);
   }
 
   async next(input: NextDropperInput): Promise<void> {
@@ -376,11 +310,9 @@ export class DefaultDropperService implements DropperService {
       input.dataDir,
       persisted.fileset,
     );
-    if (
-      filesetFiles.length === 0 ||
-      persisted.pointer_position < 0 ||
-      persisted.pointer_position >= filesetFiles.length - 1
-    ) {
+
+    this.ensurePointerWithinBounds(input.dropperName, persisted, filesetFiles);
+    if (persisted.pointer_position >= filesetFiles.length) {
       throw new DropperExhaustedError();
     }
 
@@ -397,119 +329,24 @@ export class DefaultDropperService implements DropperService {
       input.dataDir,
       persisted.fileset,
     );
-    if (
-      filesetFiles.length === 0 ||
-      persisted.pointer_position <= 0 ||
-      persisted.pointer_position >= filesetFiles.length
-    ) {
+
+    this.ensurePointerWithinBounds(input.dropperName, persisted, filesetFiles);
+
+    if (filesetFiles.length === 0 || persisted.pointer_position === 0) {
       throw new DropperAtStartError();
+    }
+
+    if (persisted.pointer_position > filesetFiles.length) {
+      throw new AppError(`Invalid dropper data: ${input.dropperName}`);
     }
 
     persisted.pointer_position -= 1;
     await this.saveDropper(filePath, persisted);
   }
 
-  async tag(input: TagDropperInput): Promise<void> {
-    const { filePath, persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
-    const filesetFiles = await this.loadFilesetFiles(
-      input.dataDir,
-      persisted.fileset,
-    );
-    const currentFile = this.getCurrentFile(persisted, filesetFiles);
-
-    for (const tag of input.tags) {
-      const updated = new Set([...(persisted.tags[tag] ?? []), currentFile]);
-      persisted.tags[tag] = Array.from(updated).sort((a, b) =>
-        a.localeCompare(b),
-      );
-    }
-
-    await this.saveDropper(filePath, persisted);
-  }
-
-  async listTags(input: ListDropperTagsInput): Promise<string[]> {
-    const { persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
-    const filesetFiles = await this.loadFilesetFiles(
-      input.dataDir,
-      persisted.fileset,
-    );
-    const currentFile = this.getCurrentFile(persisted, filesetFiles);
-
-    const tags = Object.entries(persisted.tags)
-      .filter(([, files]) => files.includes(currentFile))
-      .map(([tag]) => tag)
-      .sort((a, b) => a.localeCompare(b));
-
-    return tags;
-  }
-
-  async removeTags(input: RemoveDropperTagsInput): Promise<void> {
-    const { filePath, persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
-    const filesetFiles = await this.loadFilesetFiles(
-      input.dataDir,
-      persisted.fileset,
-    );
-    const currentFile = this.getCurrentFile(persisted, filesetFiles);
-
-    for (const tag of input.tags) {
-      const existing = persisted.tags[tag];
-      if (existing === undefined) {
-        continue;
-      }
-
-      const next = existing.filter((filePath) => filePath !== currentFile);
-      if (next.length === 0) {
-        delete persisted.tags[tag];
-      } else {
-        persisted.tags[tag] = Array.from(new Set(next)).sort((a, b) =>
-          a.localeCompare(b),
-        );
-      }
-    }
-
-    await this.saveDropper(filePath, persisted);
-  }
-
-  async listFiles(input: ListFilesDropperInput): Promise<DropperEntry[]> {
-    const { persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
-    const filesetFiles = await this.loadFilesetFiles(
-      input.dataDir,
-      persisted.fileset,
-    );
-    let entries = this.buildEntries(filesetFiles, persisted.tags);
-
-    if (input.filename !== undefined) {
-      const matched = entries.find((entry) => entry.path === input.filename);
-      entries = matched === undefined ? [] : [matched];
-    }
-
-    if (input.tags !== undefined && input.tags.length > 0) {
-      const wanted = new Set(input.tags);
-      entries = entries.filter((entry) =>
-        entry.tags.some((tag) => wanted.has(tag)),
-      );
-    }
-
-    return entries;
-  }
-
   async list(input: ListDropperInput): Promise<string[]> {
     const droppersDirectory = getDroppersDirectory(input.dataDir);
     const files = await this.deps.readDirFn(droppersDirectory);
-
-    // Get all valid dropper names by stripping .json extension
     const validNames = files
       .filter((file) => file.endsWith(".json"))
       .map((file) => file.slice(0, -5))
@@ -519,7 +356,6 @@ export class DefaultDropperService implements DropperService {
       return validNames;
     }
 
-    // If filtering by fileset, we need to read each dropper to check its fileset source
     const matchedDroppers: string[] = [];
     for (const name of validNames) {
       try {
@@ -527,10 +363,32 @@ export class DefaultDropperService implements DropperService {
         if (persisted.fileset === input.filesetName) {
           matchedDroppers.push(name);
         }
-      } catch (_error) {}
+      } catch {}
     }
 
     return matchedDroppers;
+  }
+
+  async listFiles(input: ListFilesDropperInput): Promise<string[]> {
+    const { persisted } = await this.loadDropper(input.dataDir, input.dropperName);
+    const filesetFiles = await this.loadFilesetFiles(
+      input.dataDir,
+      persisted.fileset,
+    );
+
+    this.ensurePointerWithinBounds(input.dropperName, persisted, filesetFiles);
+
+    return filesetFiles.filter((_filePath, index) => {
+      if (input.status === "all") {
+        return true;
+      }
+
+      if (input.status === "done") {
+        return index < persisted.pointer_position;
+      }
+
+      return index >= persisted.pointer_position;
+    });
   }
 
   async remove(input: RemoveDropperInput): Promise<void> {
@@ -542,54 +400,14 @@ export class DefaultDropperService implements DropperService {
     await this.deps.deleteFileFn(dropperPath);
   }
 
-  async dump(input: DumpDropperInput): Promise<DropperRecord> {
-    const { filePath, persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
-    const filesetFiles = await this.loadFilesetFiles(
-      input.dataDir,
-      persisted.fileset,
-    );
-    const entries = this.buildEntries(filesetFiles, persisted.tags);
-    const metadata = await this.deps.statFileFn(filePath);
-    const pointer =
-      persisted.pointer_position >= 0 &&
-      persisted.pointer_position < entries.length
-        ? persisted.pointer_position
-        : null;
-
-    return {
-      name: input.dropperName,
-      filesetName: persisted.fileset,
-      entries,
-      pointer: {
-        currentIndex: pointer,
-        total: entries.length,
-      },
-      createdAt: metadata.createdAt,
-      updatedAt: metadata.updatedAt,
-    };
-  }
-
   async isDone(input: IsDoneDropperInput): Promise<boolean> {
-    const { persisted } = await this.loadDropper(
-      input.dataDir,
-      input.dropperName,
-    );
+    const { persisted } = await this.loadDropper(input.dataDir, input.dropperName);
     const filesetFiles = await this.loadFilesetFiles(
       input.dataDir,
       persisted.fileset,
     );
-    const entries = this.buildEntries(filesetFiles, persisted.tags);
-    const untaggedPaths = entries
-      .filter((entry) => entry.tags.length === 0)
-      .map((entry) => entry.path);
 
-    if (untaggedPaths.length > 0) {
-      throw new AppError(`Untagged items remain:\n${untaggedPaths.join("\n")}`);
-    }
-
-    return true;
+    this.ensurePointerWithinBounds(input.dropperName, persisted, filesetFiles);
+    return persisted.pointer_position >= filesetFiles.length;
   }
 }
