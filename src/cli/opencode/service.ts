@@ -1,23 +1,11 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import {
-  applyEdits,
-  modify,
-  parse,
-  type FormattingOptions,
-  type ParseError,
-} from "jsonc-parser";
+import { parseJSONC, stringifyJSONC } from "confbox";
 import { AppError } from "../../file-utils/errors";
 
 const OPEN_CODE_SCHEMA_URL = "https://opencode.ai/config.json";
 const CONTROLLER_AGENT_NAME = "context-dropper-controller";
 const WORKER_AGENT_NAME = "context-dropper-worker";
-
-const JSON_FORMATTING: FormattingOptions = {
-  insertSpaces: true,
-  tabSize: 2,
-  eol: "\n",
-};
 
 type JsonObject = Record<string, unknown>;
 
@@ -77,32 +65,16 @@ function ensureTrailingNewline(value: string): string {
   return value.endsWith("\n") ? value : `${value}\n`;
 }
 
-function applyJsonEdit(
-  source: string,
-  jsonPath: (string | number)[],
-  value: unknown,
-): string {
-  return applyEdits(
-    source,
-    modify(source, jsonPath, value, {
-      formattingOptions: JSON_FORMATTING,
-    }),
-  );
-}
-
 function parseConfigDocument(content: string, filePath: string): JsonObject {
-  const errors: ParseError[] = [];
-  const parsed = parse(content, errors, {
-    allowTrailingComma: true,
-    allowEmptyContent: true,
-  });
-
-  if (errors.length > 0) {
-    throw new AppError(`Invalid OpenCode config: ${filePath}`);
+  if (content.trim().length === 0) {
+    return {};
   }
 
-  if (parsed === undefined) {
-    return {};
+  let parsed: unknown;
+  try {
+    parsed = parseJSONC(content);
+  } catch {
+    throw new AppError(`Invalid OpenCode config: ${filePath}`);
   }
 
   return asObject(parsed, filePath);
@@ -340,21 +312,19 @@ export class DefaultOpenCodeScaffoldService implements OpenCodeScaffoldService {
     input: InitOpenCodeScaffoldInput,
   ): string {
     const parsed = parseConfigDocument(originalContent, configPath);
-    let nextContent =
-      originalContent.trim().length === 0 ? "{\n}\n" : ensureTrailingNewline(originalContent);
+    const agent =
+      parsed.agent === undefined ? {} : asObject(parsed.agent, `${configPath}#agent`);
+    const nextConfig: JsonObject = {
+      ...parsed,
+      $schema: parsed.$schema ?? OPEN_CODE_SCHEMA_URL,
+      agent: {
+        ...agent,
+        [CONTROLLER_AGENT_NAME]: buildControllerAgent(input.controllerModel ?? ""),
+        [WORKER_AGENT_NAME]: buildWorkerAgent(input.workerModel ?? ""),
+      },
+    };
 
-    if (parsed.$schema === undefined) {
-      nextContent = applyJsonEdit(nextContent, ["$schema"], OPEN_CODE_SCHEMA_URL);
-    }
-
-    nextContent = applyJsonEdit(nextContent, ["agent", CONTROLLER_AGENT_NAME], {
-      ...buildControllerAgent(input.controllerModel ?? ""),
-    });
-    nextContent = applyJsonEdit(nextContent, ["agent", WORKER_AGENT_NAME], {
-      ...buildWorkerAgent(input.workerModel ?? ""),
-    });
-
-    return ensureTrailingNewline(nextContent);
+    return ensureTrailingNewline(stringifyJSONC(nextConfig, { indent: 2 }));
   }
 
   async init(

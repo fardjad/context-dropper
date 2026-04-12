@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
-import { parse } from "jsonc-parser";
 import { AppError } from "../../file-utils/errors";
 import {
   DefaultOpenCodeScaffoldService,
@@ -49,9 +48,7 @@ function parseConfig(fs: MemoryFs, filePath: string): Record<string, unknown> {
     throw new Error(`Expected config to exist: ${filePath}`);
   }
 
-  return parse(content, [], {
-    allowTrailingComma: true,
-  }) as Record<string, unknown>;
+  return JSON.parse(content) as Record<string, unknown>;
 }
 
 function getObject(
