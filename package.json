@@ -1,6 +1,6 @@
 {
   "name": "context-dropper",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "CLI for running file-by-file agent loops over filesets, markdown tasks, and pointer-based droppers.",
   "author": {
     "name": "Fardjad Davari",
